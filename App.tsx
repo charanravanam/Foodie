@@ -734,7 +734,14 @@ function App() {
 
   // Auth Listener
   useEffect(() => {
+    // Safety timeout: If Firebase takes longer than 3 seconds, stop loading
+    // This allows the user to see the Login screen if firebase fails silently or network is slow
+    const timeoutId = setTimeout(() => {
+      setLoadingAuth(false);
+    }, 3000);
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      clearTimeout(timeoutId);
       setCurrentUser(user);
       setLoadingAuth(false);
       
@@ -756,7 +763,10 @@ function App() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, []);
 
   const calculateDailyGoals = (profile: UserProfile) => {
