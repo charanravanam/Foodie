@@ -1,0 +1,7 @@
+{
+  "name": "Dr Foodie",
+  "description": "AI-powered nutrition assistant providing personalized micro-analysis for every body type based on food scans.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
