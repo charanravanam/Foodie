@@ -67,7 +67,7 @@ export const analyzeFoodImage = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: {
         parts: [
           {
@@ -77,7 +77,7 @@ export const analyzeFoodImage = async (
             },
           },
           {
-            text: "Identify the food and provide nutritional breakdown.",
+            text: "Identify the food and provide nutritional breakdown in JSON format.",
           },
         ],
       },
