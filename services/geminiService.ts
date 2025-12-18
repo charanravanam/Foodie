@@ -1,17 +1,16 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { UserProfile } from "../types";
 
-// Schema for the structured output we want from Gemini
 const analysisSchema: Schema = {
   type: Type.OBJECT,
   properties: {
     foodName: {
       type: Type.STRING,
-      description: "A short, descriptive name of the identified food.",
+      description: "Descriptive name of the identified food.",
     },
     calories: {
       type: Type.NUMBER,
-      description: "Estimated total calories in the image.",
+      description: "Estimated total calories.",
     },
     protein: {
       type: Type.NUMBER,
@@ -27,11 +26,11 @@ const analysisSchema: Schema = {
     },
     healthScore: {
       type: Type.NUMBER,
-      description: "A score from 1 to 10 rating the healthiness of this meal.",
+      description: "Health rating from 1 to 10.",
     },
     microAnalysis: {
       type: Type.STRING,
-      description: "A personalized micro-analysis and advice paragraph based on the user's specific gender, weight goals, and timeframe.",
+      description: "Personalized advice based on the user's specific body metrics and goals.",
     },
   },
   required: ["foodName", "calories", "protein", "carbs", "fat", "healthScore", "microAnalysis"],
@@ -43,26 +42,27 @@ export const analyzeFoodImage = async (
 ): Promise<any> => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("API Key is missing");
+    throw new Error("API Key is missing. Please ensure process.env.API_KEY is configured.");
   }
 
   const ai = new GoogleGenAI({ apiKey });
 
   const systemPrompt = `
-    You are Dr Foodie, a world-class nutritionist AI. 
-    Your task is to analyze food images and provide nutritional data.
+    You are Dr Foodie, an elite nutrition AI. 
+    Analyze the food image provided and return nutritional data.
     
-    CRITICAL: You must tailor the 'microAnalysis' specifically to the user's profile:
+    USER PROFILE:
     - Gender: ${userProfile.gender}
     - Age: ${userProfile.age}
-    - Current Weight: ${userProfile.weight}kg
-    - Target Weight: ${userProfile.targetWeight}kg
+    - Weight: ${userProfile.weight}kg
+    - Target: ${userProfile.targetWeight}kg
     - Goal: ${userProfile.goal}
     - Timeline: ${userProfile.durationWeeks} weeks
     
-    Provide specific advice on how this meal fits into their plan to reach ${userProfile.targetWeight}kg in ${userProfile.durationWeeks} weeks.
+    In 'microAnalysis', provide 2-3 sentences of direct advice on how this specific meal helps or hinders their progress towards ${userProfile.targetWeight}kg. 
+    Be encouraging but scientific.
     
-    If the image is not food, return 0 for values and "Not Food" for foodName.
+    If the image contains no food, return "Not Food" for foodName and 0 for all numerical values.
   `;
 
   try {
@@ -77,7 +77,7 @@ export const analyzeFoodImage = async (
             },
           },
           {
-            text: "Analyze this meal.",
+            text: "Identify the food and provide nutritional breakdown.",
           },
         ],
       },
@@ -89,7 +89,7 @@ export const analyzeFoodImage = async (
     });
 
     const text = response.text;
-    if (!text) throw new Error("No response from AI");
+    if (!text) throw new Error("AI returned an empty response.");
     
     return JSON.parse(text);
   } catch (error) {

@@ -21,22 +21,19 @@ const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose, onUpgrade 
   const handleRazorpayPayment = () => {
     setIsLoading(true);
     
-    // Client-side initialization with provided Key ID
     const options = {
-      key: "rzp_live_Rp3PKVq2k7vnBq", // Updated with your provided live key
+      key: "rzp_live_Rp3PKVq2k7vnBq",
       amount: 4900, // ₹49.00
       currency: "INR",
       name: "Dr Foodie",
-      description: "Dr Foodie Pro Monthly Subscription",
+      description: "Pro Monthly Subscription",
       image: "https://www.foodieqr.com/assets/img/logo.svg",
       handler: function (response: any) {
-        // Successful payment
-        // console.log(response.razorpay_payment_id);
         setIsLoading(false);
         onUpgrade();
       },
       prefill: {
-        name: "", // Can be pre-filled from user profile if available
+        name: "",
         email: "",
         contact: ""
       },
@@ -59,65 +56,67 @@ const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose, onUpgrade 
       rzp1.open();
     } catch (error) {
       console.error("Razorpay Error:", error);
-      alert("Could not initiate payment. Please check configuration.");
+      alert("Payment gateway unavailable. Please try again later.");
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden relative shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+      <div className="bg-white rounded-[40px] w-full max-w-sm overflow-hidden relative shadow-2xl">
         <button 
           onClick={onClose}
           disabled={isLoading}
-          className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors z-10"
+          className="absolute top-6 right-6 p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors z-10"
         >
           <X size={20} className="text-gray-600" />
         </button>
 
-        <div className="bg-gradient-to-br from-primary to-secondary p-8 text-center text-white">
-          <Crown size={48} className="mx-auto mb-4 text-accent" />
-          <h2 className="text-2xl font-bold mb-2">Dr Foodie Pro</h2>
-          <p className="opacity-90">Unlock Unlimited Analysis</p>
+        <div className="bg-gradient-to-br from-black via-gray-900 to-gray-800 p-10 text-center text-white">
+          <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+            <Crown size={32} className="text-yellow-400 fill-yellow-400" />
+          </div>
+          <h2 className="text-3xl font-heading font-bold mb-1">Dr Foodie Pro</h2>
+          <p className="opacity-70 text-sm">Elevate Your Nutrition Journey</p>
         </div>
 
-        <div className="p-6 space-y-6">
-          <div className="space-y-3">
+        <div className="p-8 space-y-6">
+          <div className="space-y-4">
             {[
               "Unlimited Food Scans",
-              "Advanced Micro-Analysis",
-              "Deep Body Type Insights",
-              "Export Health Reports",
-              "Priority Processing"
+              "AI Personalized Workout Plans",
+              "Deep Body Metric Insights",
+              "Priority Support",
+              "No Advertisements"
             ].map((feature, i) => (
               <div key={i} className="flex items-center gap-3">
-                <div className="bg-green-100 p-1 rounded-full">
-                  <Check size={14} className="text-primary" />
+                <div className="bg-green-50 p-1 rounded-full">
+                  <Check size={14} className="text-green-600" />
                 </div>
-                <span className="text-gray-700 font-medium">{feature}</span>
+                <span className="text-gray-700 font-medium text-sm">{feature}</span>
               </div>
             ))}
           </div>
 
           <div className="text-center pt-2">
-            <span className="text-3xl font-bold text-gray-900">₹49</span>
-            <span className="text-gray-500"> / month</span>
+            <div className="text-4xl font-heading font-bold text-black">₹49<span className="text-lg text-gray-400 font-medium"> / mo</span></div>
+            <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest font-bold">Cancel Anytime</p>
           </div>
 
           <button
             onClick={handleRazorpayPayment}
             disabled={isLoading}
-            className="w-full bg-primary hover:bg-secondary text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-primary/30 transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full bg-black hover:bg-gray-900 text-white font-bold py-5 rounded-2xl transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-70"
           >
             {isLoading ? (
-              <Loader2 className="animate-spin" size={20} />
+              <Loader2 className="animate-spin" size={24} />
             ) : (
-              "Upgrade Now"
+              "Upgrade to Pro"
             )}
           </button>
           
-          <p className="text-xs text-center text-gray-400">
-            Secured by Razorpay. Cancel anytime.
+          <p className="text-[10px] text-center text-gray-400 px-4">
+            By upgrading, you agree to our Terms of Service. Secure payments processed by Razorpay.
           </p>
         </div>
       </div>

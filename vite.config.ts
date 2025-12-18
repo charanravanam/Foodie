@@ -4,10 +4,14 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './', // Ensures assets are linked correctly on GitHub Pages
+  base: './', // Ensures assets are linked correctly regardless of subfolder deployment
   define: {
-    // This prevents "process is not defined" error in the browser
-    // IMPORTANT: Replace 'YOUR_GEMINI_API_KEY' with your actual key in the .env file or here for testing
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY || "") 
+  },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: false,
+    minify: 'terser',
   }
 })
