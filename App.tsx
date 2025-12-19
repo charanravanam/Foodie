@@ -15,8 +15,7 @@ import {
   Crown,
   Loader2,
   TrendingUp,
-  Apple,
-  Target
+  Apple
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import Onboarding from './components/Onboarding';
@@ -42,31 +41,33 @@ const App: React.FC = () => {
   const [loadingProfile, setLoadingProfile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync Data with Firestore
+  // Sync Data with Firestore - Robustly handle initial load and persistence
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (u) {
         setLoadingProfile(true);
         try {
-          // 1. Fetch Profile
+          // 1. Fetch Profile first to decide if we need onboarding
           const docRef = doc(db, "profiles", u.uid);
           const docSnap = await getDoc(docRef);
+          
           if (docSnap.exists()) {
-            setProfile(docSnap.data() as UserProfile);
+            const profileData = docSnap.data() as UserProfile;
+            setProfile(profileData);
+            
+            // 2. Fetch scans
+            const scansRef = collection(db, "profiles", u.uid, "scans");
+            const q = query(scansRef, orderBy("timestamp", "desc"));
+            const querySnapshot = await getDocs(q);
+            const loadedScans: ScanHistoryItem[] = [];
+            querySnapshot.forEach((doc) => {
+              loadedScans.push({ id: doc.id, ...doc.data() } as ScanHistoryItem);
+            });
+            setScans(loadedScans);
           } else {
             setProfile(null);
           }
-
-          // 2. Fetch Scans
-          const scansRef = collection(db, "profiles", u.uid, "scans");
-          const q = query(scansRef, orderBy("timestamp", "desc"));
-          const querySnapshot = await getDocs(q);
-          const loadedScans: ScanHistoryItem[] = [];
-          querySnapshot.forEach((doc) => {
-            loadedScans.push({ id: doc.id, ...doc.data() } as ScanHistoryItem);
-          });
-          setScans(loadedScans);
         } catch (err) {
           console.error("Firestore sync error:", err);
         } finally {
@@ -86,7 +87,11 @@ const App: React.FC = () => {
     if (!user) return;
     const newProfile = { ...(profile || {}), ...p } as UserProfile;
     setProfile(newProfile);
-    await setDoc(doc(db, "profiles", user.uid), newProfile);
+    try {
+      await setDoc(doc(db, "profiles", user.uid), newProfile);
+    } catch (err) {
+      console.error("Failed to save profile:", err);
+    }
   };
 
   const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,8 +125,8 @@ const App: React.FC = () => {
         setScans(prev => [newScan, ...prev]);
         setAnalysis(newScan);
       } catch (err) {
-        console.error(err);
-        alert("Scanning failed. Please check your network and try again.");
+        console.error("Scan analysis failed:", err);
+        alert("Scanning failed. This often happens if the API_KEY environment variable is not correctly set in your GitHub deployment settings.");
         setView('home');
       } finally {
         setIsAnalyzing(false);
@@ -174,11 +179,11 @@ const App: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white p-6 rounded-[32px] shadow-card">
+          <div className="bg-white p-6 rounded-[32px] shadow-card text-center">
             <div className="text-xs font-bold text-gray-400 uppercase mb-1">Total Logs</div>
             <div className="text-3xl font-bold">{scans.length}</div>
           </div>
-          <div className="bg-white p-6 rounded-[32px] shadow-card">
+          <div className="bg-white p-6 rounded-[32px] shadow-card text-center">
             <div className="text-xs font-bold text-gray-400 uppercase mb-1">Avg Kcal</div>
             <div className="text-3xl font-bold">
               {scans.length > 0 ? Math.round(scans.reduce((a,b)=>a+b.calories,0) / scans.length) : 0}
@@ -199,7 +204,7 @@ const App: React.FC = () => {
   }
 
   if (!user) return <Auth />;
-  if (!profile || !profile.isOnboarded) return <Onboarding onComplete={(p) => saveProfile(p)} />;
+  if (!profile || !profile.isOnboarded) return <Onboarding onComplete={(p) => saveProfile(p)} initialData={profile} />;
 
   const todayScans = scans.filter(s => new Date(s.timestamp).toDateString() === new Date().toDateString());
   const todayCalories = todayScans.reduce((a, b) => a + (b.calories || 0), 0);

@@ -22,15 +22,20 @@ const Auth = () => {
         await createUserWithEmailAndPassword(auth, email, password);
       }
     } catch (err: any) {
+      console.error("Auth Error:", err);
       const firebaseError = err as AuthError;
-      let msg = "An error occurred.";
-      if (firebaseError.code === 'auth/invalid-email') msg = "Invalid email address.";
-      if (firebaseError.code === 'auth/user-disabled') msg = "User account is disabled.";
-      if (firebaseError.code === 'auth/user-not-found') msg = "No user found with this email.";
-      if (firebaseError.code === 'auth/wrong-password') msg = "Incorrect password.";
-      if (firebaseError.code === 'auth/email-already-in-use') msg = "Email already in use.";
-      if (firebaseError.code === 'auth/weak-password') msg = "Password should be at least 6 characters.";
-      setError(msg);
+      let msg = "An unexpected error occurred. Please try again.";
+      
+      if (firebaseError.code === 'auth/invalid-email') msg = "Invalid email address format.";
+      if (firebaseError.code === 'auth/user-disabled') msg = "This account has been disabled.";
+      if (firebaseError.code === 'auth/user-not-found') msg = "No account found with this email.";
+      if (firebaseError.code === 'auth/wrong-password') msg = "Incorrect password. Please try again.";
+      if (firebaseError.code === 'auth/email-already-in-use') msg = "An account with this email already exists.";
+      if (firebaseError.code === 'auth/weak-password') msg = "Password is too weak. Use at least 6 characters.";
+      if (firebaseError.code === 'auth/network-request-failed') msg = "Network error. Please check your internet connection.";
+      if (firebaseError.code === 'auth/too-many-requests') msg = "Too many failed attempts. Try again later.";
+      
+      setError(`${msg} (${firebaseError.code})`);
     } finally {
       setLoading(false);
     }
@@ -74,7 +79,7 @@ const Auth = () => {
           </div>
 
           {error && (
-            <div className="p-3 bg-red-50 text-red-500 text-sm font-medium rounded-xl text-center">
+            <div className="p-3 bg-red-50 text-red-500 text-xs font-medium rounded-xl text-center leading-relaxed">
               {error}
             </div>
           )}
@@ -98,6 +103,7 @@ const Auth = () => {
           <p className="text-gray-500 text-sm">
             {isLogin ? "Don't have an account?" : "Already have an account?"}
             <button
+              type="button"
               onClick={() => { setIsLogin(!isLogin); setError(null); }}
               className="ml-2 font-bold text-black hover:underline"
             >

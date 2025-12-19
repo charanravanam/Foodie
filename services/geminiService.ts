@@ -6,8 +6,15 @@ export const analyzeFoodImage = async (
   base64Image: string,
   userProfile: UserProfile
 ): Promise<any> => {
-  // Use process.env.API_KEY directly as per naming requirement
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Use process.env.API_KEY directly as per guidelines. 
+  // Ensure your GitHub Action build step has the API_KEY environment variable.
+  const apiKey = process.env.API_KEY;
+  
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please set the API_KEY environment variable.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
 
   const systemPrompt = `
     You are Dr Foodie, an elite nutrition AI. 
@@ -79,13 +86,13 @@ export const analyzeFoodImage = async (
       },
     });
 
-    // Directly access .text property from GenerateContentResponse
     const text = response.text;
     if (!text) throw new Error("Received empty text from AI.");
     
     return JSON.parse(text);
   } catch (error) {
-    console.error("Gemini Analysis Error:", error);
+    console.error("Gemini Analysis Error Detail:", error);
+    // Code 6/XHR errors often mean the API Key is invalid or empty in the production build.
     throw error;
   }
 };
