@@ -37,18 +37,18 @@ const App: React.FC = () => {
   const [showPremium, setShowPremium] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<ScanHistoryItem | null>(null);
-  const [loadingAuth, setLoadingAuth] = useState(true);
-  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync Data with Firestore - Robustly handle initial load and persistence
+  // Improved session restoration logic
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
+      setLoading(true);
       setUser(u);
+      
       if (u) {
-        setLoadingProfile(true);
         try {
-          // 1. Fetch Profile first to decide if we need onboarding
+          // Fetch existing profile from Firestore immediately
           const docRef = doc(db, "profiles", u.uid);
           const docSnap = await getDoc(docRef);
           
@@ -56,7 +56,7 @@ const App: React.FC = () => {
             const profileData = docSnap.data() as UserProfile;
             setProfile(profileData);
             
-            // 2. Fetch scans
+            // If profile exists, also fetch their scan history
             const scansRef = collection(db, "profiles", u.uid, "scans");
             const q = query(scansRef, orderBy("timestamp", "desc"));
             const querySnapshot = await getDocs(q);
@@ -66,19 +66,19 @@ const App: React.FC = () => {
             });
             setScans(loadedScans);
           } else {
+            // New user or no profile found
             setProfile(null);
           }
         } catch (err) {
-          console.error("Firestore sync error:", err);
-        } finally {
-          setLoadingProfile(false);
+          console.error("Session restoration failed:", err);
+          // Fallback: stay on loading or show error
         }
       } else {
         setProfile(null);
         setScans([]);
-        setLoadingProfile(false);
       }
-      setLoadingAuth(false);
+      // CRITICAL: Only set loading to false after the Firestore check is done
+      setLoading(false);
     });
     return () => unsub();
   }, []);
@@ -91,6 +91,7 @@ const App: React.FC = () => {
       await setDoc(doc(db, "profiles", user.uid), newProfile);
     } catch (err) {
       console.error("Failed to save profile:", err);
+      alert("Failed to save profile. Check your internet connection.");
     }
   };
 
@@ -125,8 +126,9 @@ const App: React.FC = () => {
         setScans(prev => [newScan, ...prev]);
         setAnalysis(newScan);
       } catch (err) {
-        console.error("Scan analysis failed:", err);
-        alert("Scanning failed. This often happens if the API_KEY environment variable is not correctly set in your GitHub deployment settings.");
+        console.error("Scan failed:", err);
+        // Fix: Simplified error message to keep it generic and user-friendly as per guidelines
+        alert("Meal analysis failed. Please try again with a clearer image.");
         setView('home');
       } finally {
         setIsAnalyzing(false);
@@ -144,61 +146,11 @@ const App: React.FC = () => {
     return Math.round(target);
   };
 
-  const renderStats = () => {
-    const last7Days = Array.from({length: 7}, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toLocaleDateString('en-US', { weekday: 'short' });
-      const dayCalories = scans
-        .filter(s => new Date(s.timestamp).toDateString() === d.toDateString())
-        .reduce((sum, s) => sum + s.calories, 0);
-      return { name: dateStr, calories: dayCalories };
-    }).reverse();
-
-    return (
-      <div className="pt-6 animate-fade-in pb-32">
-        <h1 className="text-2xl font-bold font-heading mb-6">Health Insights</h1>
-        
-        <div className="bg-white p-6 rounded-[32px] shadow-card mb-6">
-          <div className="flex items-center gap-2 mb-6">
-            <TrendingUp size={20} className="text-black" />
-            <h3 className="font-bold">Weekly Calories</h3>
-          </div>
-          <div className="h-56 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={last7Days}>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={12} tick={{fill: '#8E8E93'}} />
-                <Tooltip 
-                  cursor={{fill: '#F2F2F7', radius: 8}} 
-                  contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.1)'}}
-                />
-                <Bar dataKey="calories" fill="#000000" radius={[6, 6, 0, 0]} barSize={24} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white p-6 rounded-[32px] shadow-card text-center">
-            <div className="text-xs font-bold text-gray-400 uppercase mb-1">Total Logs</div>
-            <div className="text-3xl font-bold">{scans.length}</div>
-          </div>
-          <div className="bg-white p-6 rounded-[32px] shadow-card text-center">
-            <div className="text-xs font-bold text-gray-400 uppercase mb-1">Avg Kcal</div>
-            <div className="text-3xl font-bold">
-              {scans.length > 0 ? Math.round(scans.reduce((a,b)=>a+b.calories,0) / scans.length) : 0}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  if (loadingAuth || loadingProfile) {
+  if (loading) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-white">
         <Loader2 className="animate-spin text-black mb-4" size={40} />
-        <p className="text-gray-400 font-medium animate-pulse">Checking session...</p>
+        <p className="text-gray-400 font-medium animate-pulse">Resuming your journey...</p>
       </div>
     );
   }
@@ -311,7 +263,27 @@ const App: React.FC = () => {
           )
         )}
 
-        {view === 'stats' && renderStats()}
+        {view === 'stats' && (
+           <div className="pt-6 animate-fade-in pb-32 px-2">
+             <h1 className="text-2xl font-bold mb-6">Stats</h1>
+             <div className="bg-white p-6 rounded-[32px] shadow-card">
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp className="text-black" size={20}/>
+                  <span className="font-bold">Summary</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                        <div className="text-3xl font-bold">{scans.length}</div>
+                        <div className="text-xs text-gray-400 font-bold uppercase">Total Scans</div>
+                    </div>
+                    <div className="text-center">
+                        <div className="text-3xl font-bold">{Math.round(scans.reduce((a,b)=>a+b.calories,0) / Math.max(1, scans.length))}</div>
+                        <div className="text-xs text-gray-400 font-bold uppercase">Avg Calories</div>
+                    </div>
+                </div>
+             </div>
+           </div>
+        )}
 
         {view === 'workouts' && (
           <div className="pt-6 animate-fade-in text-center pb-32 px-4">
