@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { auth } from '../services/firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, AuthError } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 
 const Auth = () => {
@@ -23,7 +24,8 @@ const Auth = () => {
       }
     } catch (err: any) {
       console.error("Auth Error:", err);
-      const firebaseError = err as AuthError;
+      // Fix: Accessing 'code' from error object by casting to any, as AuthError interface may not expose it consistently in all environments
+      const firebaseError = err as any;
       let msg = "An unexpected error occurred. Please try again.";
       
       if (firebaseError.code === 'auth/invalid-email') msg = "Invalid email address format.";
