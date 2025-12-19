@@ -40,7 +40,6 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Improved session restoration logic
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setLoading(true);
@@ -48,7 +47,6 @@ const App: React.FC = () => {
       
       if (u) {
         try {
-          // Fetch existing profile from Firestore immediately
           const docRef = doc(db, "profiles", u.uid);
           const docSnap = await getDoc(docRef);
           
@@ -56,7 +54,6 @@ const App: React.FC = () => {
             const profileData = docSnap.data() as UserProfile;
             setProfile(profileData);
             
-            // If profile exists, also fetch their scan history
             const scansRef = collection(db, "profiles", u.uid, "scans");
             const q = query(scansRef, orderBy("timestamp", "desc"));
             const querySnapshot = await getDocs(q);
@@ -66,18 +63,15 @@ const App: React.FC = () => {
             });
             setScans(loadedScans);
           } else {
-            // New user or no profile found
             setProfile(null);
           }
         } catch (err) {
           console.error("Session restoration failed:", err);
-          // Fallback: stay on loading or show error
         }
       } else {
         setProfile(null);
         setScans([]);
       }
-      // CRITICAL: Only set loading to false after the Firestore check is done
       setLoading(false);
     });
     return () => unsub();
@@ -91,7 +85,6 @@ const App: React.FC = () => {
       await setDoc(doc(db, "profiles", user.uid), newProfile);
     } catch (err) {
       console.error("Failed to save profile:", err);
-      alert("Failed to save profile. Check your internet connection.");
     }
   };
 
@@ -127,8 +120,7 @@ const App: React.FC = () => {
         setAnalysis(newScan);
       } catch (err) {
         console.error("Scan failed:", err);
-        // Fix: Simplified error message to keep it generic and user-friendly as per guidelines
-        alert("Meal analysis failed. Please try again with a clearer image.");
+        alert("Meal analysis failed. Please ensure your API key is configured in GitHub Secrets.");
         setView('home');
       } finally {
         setIsAnalyzing(false);
@@ -150,7 +142,7 @@ const App: React.FC = () => {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-white">
         <Loader2 className="animate-spin text-black mb-4" size={40} />
-        <p className="text-gray-400 font-medium animate-pulse">Resuming your journey...</p>
+        <p className="text-gray-400 font-medium animate-pulse">Initializing Dr Foodie...</p>
       </div>
     );
   }
@@ -170,7 +162,7 @@ const App: React.FC = () => {
         {view === 'home' && (
           <div className="pt-6 animate-fade-in pb-32">
             <header className="flex justify-between items-center mb-6">
-              <img src="https://www.foodieqr.com/assets/img/logo.svg" alt="Logo" className="h-8" />
+              <img src="https://www.foodieqr.com/assets/img/logo.svg" alt="Dr Foodie" className="h-8" />
               <button onClick={()=>setShowPremium(true)} className="px-3 py-1 bg-white border rounded-full text-xs font-bold flex items-center gap-1 shadow-sm">
                 {profile.isPremium ? <Crown size={14} className="text-yellow-500 fill-yellow-500"/> : 
                   <><span className={scans.length >= MAX_FREE_SCANS ? 'text-red-500' : 'text-black'}>{Math.max(0, MAX_FREE_SCANS - scans.length)}</span> / {MAX_FREE_SCANS} Free</>
@@ -184,7 +176,7 @@ const App: React.FC = () => {
                   <span className="text-5xl font-bold">{todayCalories}</span>
                   <span className="text-lg text-gray-400 font-medium">/{targetCals}</span>
                 </div>
-                <div className="text-sm text-gray-400 font-medium mt-1">Calories Today</div>
+                <div className="text-sm text-gray-400 font-medium mt-1">Daily Calories</div>
               </div>
               <Flame className="text-black fill-black" size={40}/>
             </div>
@@ -205,10 +197,10 @@ const App: React.FC = () => {
               {scans.length === 0 ? 
                 <div onClick={()=>fileInputRef.current?.click()} className="text-center text-gray-400 py-12 border-2 border-dashed rounded-[24px] cursor-pointer hover:bg-gray-50 transition-colors">
                   <Camera className="mx-auto mb-2 opacity-50"/>
-                  Tap to scan your first meal
+                  Scan your first meal
                 </div> : 
                 scans.slice(0, 5).map(s => (
-                  <div key={s.id} onClick={()=>{setAnalysis(s); setView('analysis')}} className="bg-white p-3 rounded-[24px] flex gap-4 shadow-card items-center cursor-pointer transition-transform hover:scale-[1.01]">
+                  <div key={s.id} onClick={()=>{setAnalysis(s); setView('analysis')}} className="bg-white p-3 rounded-[24px] flex gap-4 shadow-card items-center cursor-pointer transition-all hover:scale-[1.02]">
                     <img src={s.imageUrl} className="w-16 h-16 rounded-2xl object-cover" />
                     <div>
                       <div className="font-bold text-sm">{s.foodName}</div>
@@ -226,7 +218,7 @@ const App: React.FC = () => {
           isAnalyzing ? (
             <div className="h-[80vh] flex flex-col items-center justify-center">
               <div className="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin mb-4"></div>
-              <h2 className="text-xl font-bold">Analyzing Meal...</h2>
+              <h2 className="text-xl font-bold">Dr Foodie is Thinking...</h2>
             </div>
           ) : analysis && (
             <div className="pt-6 animate-fade-in pb-32">
@@ -237,24 +229,24 @@ const App: React.FC = () => {
                   <h1 className="text-3xl font-bold mb-4">{analysis.foodName}</h1>
                   <div className="grid grid-cols-4 gap-2 mb-6 text-center">
                     <div className="bg-gray-50 p-2 rounded-xl">
-                      <div className="text-[10px] font-bold text-gray-400">CAL</div>
+                      <div className="text-[10px] font-bold text-gray-400 uppercase">Cal</div>
                       <div className="font-bold">{analysis.calories}</div>
                     </div>
                     <div className="bg-red-50 p-2 rounded-xl text-red-500">
-                      <div className="text-[10px] font-bold">PRO</div>
+                      <div className="text-[10px] font-bold uppercase">Pro</div>
                       <div className="font-bold">{analysis.protein}g</div>
                     </div>
                     <div className="bg-orange-50 p-2 rounded-xl text-orange-500">
-                      <div className="text-[10px] font-bold">CARB</div>
+                      <div className="text-[10px] font-bold uppercase">Carb</div>
                       <div className="font-bold">{analysis.carbs}g</div>
                     </div>
                     <div className="bg-blue-50 p-2 rounded-xl text-blue-500">
-                      <div className="text-[10px] font-bold">FAT</div>
+                      <div className="text-[10px] font-bold uppercase">Fat</div>
                       <div className="font-bold">{analysis.fat}g</div>
                     </div>
                   </div>
                   <div className="bg-gray-50 p-5 rounded-[24px] border border-gray-100">
-                    <h4 className="font-bold text-sm mb-2">Dr Foodie's Analysis</h4>
+                    <h4 className="font-bold text-sm mb-2 uppercase tracking-wider text-gray-400">Personalized Insights</h4>
                     <p className="text-sm italic text-gray-600">"{analysis.microAnalysis}"</p>
                   </div>
                 </div>
@@ -265,20 +257,20 @@ const App: React.FC = () => {
 
         {view === 'stats' && (
            <div className="pt-6 animate-fade-in pb-32 px-2">
-             <h1 className="text-2xl font-bold mb-6">Stats</h1>
+             <h1 className="text-2xl font-bold mb-6">Health Stats</h1>
              <div className="bg-white p-6 rounded-[32px] shadow-card">
                 <div className="flex items-center gap-2 mb-4">
                   <TrendingUp className="text-black" size={20}/>
                   <span className="font-bold">Summary</span>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center">
+                    <div className="text-center p-4 bg-gray-50 rounded-2xl">
                         <div className="text-3xl font-bold">{scans.length}</div>
                         <div className="text-xs text-gray-400 font-bold uppercase">Total Scans</div>
                     </div>
-                    <div className="text-center">
-                        <div className="text-3xl font-bold">{Math.round(scans.reduce((a,b)=>a+b.calories,0) / Math.max(1, scans.length))}</div>
-                        <div className="text-xs text-gray-400 font-bold uppercase">Avg Calories</div>
+                    <div className="text-center p-4 bg-gray-50 rounded-2xl">
+                        <div className="text-3xl font-bold">{scans.length > 0 ? Math.round(scans.reduce((a,b)=>a+b.calories,0) / scans.length) : 0}</div>
+                        <div className="text-xs text-gray-400 font-bold uppercase">Avg Kcal</div>
                     </div>
                 </div>
              </div>
@@ -291,14 +283,14 @@ const App: React.FC = () => {
               <Dumbbell size={40} className="text-gray-400" />
             </div>
             <h2 className="text-2xl font-bold mb-2">Pro Workout Plans</h2>
-            <p className="text-gray-500 mb-8">Personalized routines generated by AI to reach your {profile.targetWeight}kg goal.</p>
+            <p className="text-gray-500 mb-8">Personalized AI routines based on your goals.</p>
             {!profile.isPremium ? (
-              <button onClick={()=>setShowPremium(true)} className="w-full bg-black text-white p-5 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2">
+              <button onClick={()=>setShowPremium(true)} className="w-full bg-black text-white p-5 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2 transition-transform active:scale-95">
                 <Crown size={20} className="text-yellow-400 fill-yellow-400"/> Upgrade for ₹49/mo
               </button>
             ) : (
-              <div className="p-6 bg-white rounded-3xl border border-dashed border-gray-200 text-gray-400">
-                Your custom AI plan is being generated. Check back in a few minutes!
+              <div className="p-6 bg-white rounded-3xl border border-dashed border-gray-200 text-gray-400 font-medium">
+                Generating your custom plan...
               </div>
             )}
           </div>
@@ -312,7 +304,7 @@ const App: React.FC = () => {
                 <div className="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center font-bold text-lg">{profile.name.charAt(0)}</div>
                 <div>
                   <div className="font-bold">{profile.name}</div>
-                  <div className="text-xs text-gray-500">{profile.isPremium ? 'Pro Member' : 'Free Member'}</div>
+                  <div className="text-xs text-gray-500 font-medium">{profile.isPremium ? 'Pro Member' : 'Free Member'}</div>
                 </div>
               </div>
               <button onClick={()=>setProfile(null)} className="w-full p-4 text-left font-medium flex justify-between hover:bg-gray-50 rounded-xl transition-colors">
@@ -332,7 +324,6 @@ const App: React.FC = () => {
       {view !== 'analysis' && (
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 pb-8 flex justify-between items-center z-40 max-w-md mx-auto shadow-floating">
           <button onClick={()=>setView('home')} className={`flex flex-col items-center gap-1 transition-colors ${view==='home'?'text-black':'text-gray-400'}`}><Home size={24}/><span className="text-[10px] font-bold">Home</span></button>
-          
           <button onClick={()=>setView('workouts')} className={`flex flex-col items-center gap-1 transition-colors ${view==='workouts'?'text-black':'text-gray-400'}`}><Dumbbell size={24}/><span className="text-[10px] font-bold">Plan</span></button>
           
           <div className="relative -mt-12">
@@ -342,7 +333,6 @@ const App: React.FC = () => {
           </div>
 
           <button onClick={()=>setView('stats')} className={`flex flex-col items-center gap-1 transition-colors ${view==='stats'?'text-black':'text-gray-400'}`}><BarChart2 size={24}/><span className="text-[10px] font-bold">Stats</span></button>
-          
           <button onClick={()=>setView('settings')} className={`flex flex-col items-center gap-1 transition-colors ${view==='settings'?'text-black':'text-gray-400'}`}><Settings size={24}/><span className="text-[10px] font-bold">Settings</span></button>
         </nav>
       )}
