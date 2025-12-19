@@ -1,7 +1,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-// Using firestore/lite to ensure consistent export availability in the current environment
+// Switched to firebase/firestore/lite to ensure consistent modular exports in this environment
 import { getFirestore } from "firebase/firestore/lite";
 
 const firebaseConfig = {

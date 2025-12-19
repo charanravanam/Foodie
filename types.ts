@@ -1,3 +1,4 @@
+
 export enum Gender {
   MALE = 'Male',
   FEMALE = 'Female',
@@ -38,11 +39,12 @@ export interface UserProfile {
   targetWeight: number; // Target weight in kg
   durationWeeks: number; // Timeframe to achieve goal
   goal: Goal;
-  workoutGoal?: WorkoutGoal; // Optional until set
-  workoutLocation?: WorkoutLocation; // Gym or Home
+  workoutGoal?: WorkoutGoal; 
+  workoutLocation?: WorkoutLocation; 
   isOnboarded: boolean;
   progressPhotos?: ProgressPhoto[];
   isPremium?: boolean;
+  dailyWaterGoal?: number; // In ml
 }
 
 export interface FoodAnalysis {
@@ -54,7 +56,8 @@ export interface FoodAnalysis {
   healthScore: number; // 1-10
   microAnalysis: string;
   timestamp: string;
-  imageUrl?: string; // Added to store the uploaded image for display
+  imageUrl?: string;
+  mealType?: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
 }
 
 export interface ScanHistoryItem extends FoodAnalysis {
@@ -68,5 +71,5 @@ export interface Exercise {
   reps: string;
   description: string;
   imageUrl: string;
-  instructions?: string[]; // Step-by-step guide
+  instructions?: string[];
 }
