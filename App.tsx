@@ -25,7 +25,8 @@ import { UserProfile, ScanHistoryItem, Gender, Goal } from './types';
 import { analyzeFoodImage } from './services/geminiService';
 import { auth, db } from './services/firebase';
 import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc } from 'firebase/firestore/lite';
+// Fix: Import from firebase/firestore instead of firebase/firestore/lite to ensure all members are exported
+import { doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc } from 'firebase/firestore';
 
 const MAX_FREE_SCANS = 3;
 
@@ -120,7 +121,7 @@ const App: React.FC = () => {
         setAnalysis(newScan);
       } catch (err) {
         console.error("Scan failed:", err);
-        alert("Meal analysis failed. Please ensure your API key is configured in GitHub Secrets.");
+        alert("Meal analysis failed. Please ensure your API key is configured correctly.");
         setView('home');
       } finally {
         setIsAnalyzing(false);
