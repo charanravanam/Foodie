@@ -6,14 +6,8 @@ export const analyzeFoodImage = async (
   base64Image: string,
   userProfile: UserProfile
 ): Promise<any> => {
-  // Access API key from injected environment variable
-  const apiKey = process.env.API_KEY;
-  
-  if (!apiKey) {
-    throw new Error("Missing Gemini API Key. Ensure it is defined in Repo Secrets.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Always use the named parameter and process.env.API_KEY directly as per guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const systemPrompt = `
     You are Dr Foodie, an elite nutrition AI. 
