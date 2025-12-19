@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Home, 
@@ -6,77 +7,28 @@ import {
   Plus, 
   Flame, 
   ChevronRight, 
-  Beef, 
-  Wheat, 
-  Droplet,
-  Apple,
   ArrowLeft,
-  X,
   Camera,
-  Trash2,
-  Calendar as CalendarIcon,
   User,
   Dumbbell,
-  PlayCircle,
-  Timer,
-  Activity,
-  Lock,
-  CheckCircle2,
-  Building2,
-  Home as HomeIcon,
-  Moon,
-  Sun,
-  List,
-  Scale,
-  Target,
   LogOut,
   Crown,
-  Loader2
+  Loader2,
+  TrendingUp,
+  Apple,
+  Target
 } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import Onboarding from './components/Onboarding';
 import PremiumModal from './components/PremiumModal';
 import Auth from './components/Auth';
-import { UserProfile, FoodAnalysis, ScanHistoryItem, Gender, Goal, WorkoutGoal, Exercise, WorkoutLocation } from './types';
+import { UserProfile, ScanHistoryItem, Gender, Goal } from './types';
 import { analyzeFoodImage } from './services/geminiService';
-import { auth } from './services/firebase';
+import { auth, db } from './services/firebase';
 import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc } from 'firebase/firestore/lite';
 
 const MAX_FREE_SCANS = 3;
-
-const HOME_WORKOUTS: Record<string, Exercise[]> = {
-  [WorkoutGoal.BELLY_FAT]: [
-    { 
-      id: 'h1', 
-      name: 'Mountain Climbers', 
-      sets: 3, 
-      reps: '45 sec', 
-      description: 'Drive knees to chest rapidly keeping core tight.', 
-      imageUrl: 'https://images.unsplash.com/photo-1434608519344-49d77a699ded?w=800&q=80',
-      instructions: ["High plank position.", "Drive knees to chest.", "Fast pace."]
-    },
-    { 
-      id: 'h2', 
-      name: 'Plank', 
-      sets: 3, 
-      reps: '60 sec', 
-      description: 'Maintain a straight line from head to heels.', 
-      imageUrl: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80',
-      instructions: ["Forearms on floor.", "Straight body line.", "Squeeze core."]
-    }
-  ],
-  [WorkoutGoal.OVERALL_FAT_LOSS]: [
-    { 
-      id: 'h5', 
-      name: 'Burpees', 
-      sets: 3, 
-      reps: '12 reps', 
-      description: 'Full body explosive movement.', 
-      imageUrl: 'https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?w=800&q=80',
-      instructions: ["Squat, kick back.", "Pushup.", "Jump up."]
-    }
-  ]
-};
 
 const App: React.FC = () => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -87,30 +39,59 @@ const App: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<ScanHistoryItem | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [loadingProfile, setLoadingProfile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Sync Data with Firestore
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
-      setLoadingAuth(false);
       if (u) {
-        const saved = localStorage.getItem(`drfoodie_${u.uid}`);
-        if (saved) setProfile(JSON.parse(saved));
+        setLoadingProfile(true);
+        try {
+          // 1. Fetch Profile
+          const docRef = doc(db, "profiles", u.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            setProfile(docSnap.data() as UserProfile);
+          } else {
+            setProfile(null);
+          }
+
+          // 2. Fetch Scans
+          const scansRef = collection(db, "profiles", u.uid, "scans");
+          const q = query(scansRef, orderBy("timestamp", "desc"));
+          const querySnapshot = await getDocs(q);
+          const loadedScans: ScanHistoryItem[] = [];
+          querySnapshot.forEach((doc) => {
+            loadedScans.push({ id: doc.id, ...doc.data() } as ScanHistoryItem);
+          });
+          setScans(loadedScans);
+        } catch (err) {
+          console.error("Firestore sync error:", err);
+        } finally {
+          setLoadingProfile(false);
+        }
+      } else {
+        setProfile(null);
+        setScans([]);
+        setLoadingProfile(false);
       }
+      setLoadingAuth(false);
     });
     return () => unsub();
   }, []);
 
-  const saveProfile = (p: Partial<UserProfile>) => {
-    if (!profile && !p.isOnboarded) return;
+  const saveProfile = async (p: Partial<UserProfile>) => {
+    if (!user) return;
     const newProfile = { ...(profile || {}), ...p } as UserProfile;
     setProfile(newProfile);
-    if (user) localStorage.setItem(`drfoodie_${user.uid}`, JSON.stringify(newProfile));
+    await setDoc(doc(db, "profiles", user.uid), newProfile);
   };
 
   const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !profile) return;
+    if (!file || !profile || !user) return;
     
     if (!profile.isPremium && scans.length >= MAX_FREE_SCANS) {
       setShowPremium(true);
@@ -127,16 +108,20 @@ const App: React.FC = () => {
       const base64 = (reader.result as string).split(',')[1];
       try {
         const res = await analyzeFoodImage(base64, profile);
-        const newScan: ScanHistoryItem = { 
+        const scanData = { 
           ...res, 
           imageUrl: reader.result as string, 
-          id: Date.now().toString(), 
           timestamp: new Date().toISOString() 
         };
+        
+        const docRef = await addDoc(collection(db, "profiles", user.uid, "scans"), scanData);
+        const newScan = { ...scanData, id: docRef.id };
+        
         setScans(prev => [newScan, ...prev]);
         setAnalysis(newScan);
       } catch (err) {
-        alert("Analysis failed. Please check your API key and try again.");
+        console.error(err);
+        alert("Scanning failed. Please check your network and try again.");
         setView('home');
       } finally {
         setIsAnalyzing(false);
@@ -144,12 +129,9 @@ const App: React.FC = () => {
     };
   };
 
-  if (loadingAuth) return <div className="h-screen flex items-center justify-center bg-white"><Loader2 className="animate-spin text-black" size={32}/></div>;
-  if (!user) return <Auth />;
-  if (!profile) return <Onboarding onComplete={(p) => saveProfile(p)} />;
-
   const getCalorieTarget = () => {
-    const base = (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + (profile.gender === Gender.MALE ? 5 : -161);
+    if (!profile) return 2000;
+    const base = (10 * profile.weight) + (6.25 * (profile.height || 170)) - (5 * profile.age) + (profile.gender === Gender.MALE ? 5 : -161);
     const multiplier = 1.375;
     let target = base * multiplier;
     if(profile.goal === Goal.LOSE_WEIGHT) target -= 500;
@@ -157,13 +139,79 @@ const App: React.FC = () => {
     return Math.round(target);
   };
 
+  const renderStats = () => {
+    const last7Days = Array.from({length: 7}, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const dayCalories = scans
+        .filter(s => new Date(s.timestamp).toDateString() === d.toDateString())
+        .reduce((sum, s) => sum + s.calories, 0);
+      return { name: dateStr, calories: dayCalories };
+    }).reverse();
+
+    return (
+      <div className="pt-6 animate-fade-in pb-32">
+        <h1 className="text-2xl font-bold font-heading mb-6">Health Insights</h1>
+        
+        <div className="bg-white p-6 rounded-[32px] shadow-card mb-6">
+          <div className="flex items-center gap-2 mb-6">
+            <TrendingUp size={20} className="text-black" />
+            <h3 className="font-bold">Weekly Calories</h3>
+          </div>
+          <div className="h-56 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={last7Days}>
+                <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={12} tick={{fill: '#8E8E93'}} />
+                <Tooltip 
+                  cursor={{fill: '#F2F2F7', radius: 8}} 
+                  contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.1)'}}
+                />
+                <Bar dataKey="calories" fill="#000000" radius={[6, 6, 0, 0]} barSize={24} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white p-6 rounded-[32px] shadow-card">
+            <div className="text-xs font-bold text-gray-400 uppercase mb-1">Total Logs</div>
+            <div className="text-3xl font-bold">{scans.length}</div>
+          </div>
+          <div className="bg-white p-6 rounded-[32px] shadow-card">
+            <div className="text-xs font-bold text-gray-400 uppercase mb-1">Avg Kcal</div>
+            <div className="text-3xl font-bold">
+              {scans.length > 0 ? Math.round(scans.reduce((a,b)=>a+b.calories,0) / scans.length) : 0}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (loadingAuth || loadingProfile) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-white">
+        <Loader2 className="animate-spin text-black mb-4" size={40} />
+        <p className="text-gray-400 font-medium animate-pulse">Checking session...</p>
+      </div>
+    );
+  }
+
+  if (!user) return <Auth />;
+  if (!profile || !profile.isOnboarded) return <Onboarding onComplete={(p) => saveProfile(p)} />;
+
+  const todayScans = scans.filter(s => new Date(s.timestamp).toDateString() === new Date().toDateString());
+  const todayCalories = todayScans.reduce((a, b) => a + (b.calories || 0), 0);
+  const targetCals = getCalorieTarget();
+
   return (
     <div className="max-w-md mx-auto min-h-screen bg-[#F2F2F7] text-black relative shadow-2xl overflow-hidden flex flex-col">
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleScan} />
       
-      <div className="flex-1 px-6 overflow-y-auto no-scrollbar pb-24">
+      <div className="flex-1 px-6 overflow-y-auto no-scrollbar">
         {view === 'home' && (
-          <div className="pt-6 animate-fade-in">
+          <div className="pt-6 animate-fade-in pb-32">
             <header className="flex justify-between items-center mb-6">
               <img src="https://www.foodieqr.com/assets/img/logo.svg" alt="Logo" className="h-8" />
               <button onClick={()=>setShowPremium(true)} className="px-3 py-1 bg-white border rounded-full text-xs font-bold flex items-center gap-1 shadow-sm">
@@ -176,18 +224,18 @@ const App: React.FC = () => {
             <div className="bg-white p-6 rounded-[32px] shadow-card mb-6 flex items-center justify-between">
               <div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-5xl font-bold">{scans.reduce((a, b) => a + (b.calories || 0), 0)}</span>
-                  <span className="text-lg text-gray-400 font-medium">/{getCalorieTarget()}</span>
+                  <span className="text-5xl font-bold">{todayCalories}</span>
+                  <span className="text-lg text-gray-400 font-medium">/{targetCals}</span>
                 </div>
-                <div className="text-sm text-gray-400 font-medium mt-1">Calories Eaten</div>
+                <div className="text-sm text-gray-400 font-medium mt-1">Calories Today</div>
               </div>
               <Flame className="text-black fill-black" size={40}/>
             </div>
 
             <div className="grid grid-cols-3 gap-3 mb-8">
-               {[{l:'Protein', v: scans.reduce((a,b)=>a+b.protein,0), c:'text-red-500', bg:'bg-red-50'},
-                 {l:'Carbs', v: scans.reduce((a,b)=>a+b.carbs,0), c:'text-orange-500', bg:'bg-orange-50'},
-                 {l:'Fats', v: scans.reduce((a,b)=>a+b.fat,0), c:'text-blue-500', bg:'bg-blue-50'}].map((m,i)=>(
+               {[{l:'Protein', v: todayScans.reduce((a,b)=>a+b.protein,0), c:'text-red-500', bg:'bg-red-50'},
+                 {l:'Carbs', v: todayScans.reduce((a,b)=>a+b.carbs,0), c:'text-orange-500', bg:'bg-orange-50'},
+                 {l:'Fats', v: todayScans.reduce((a,b)=>a+b.fat,0), c:'text-blue-500', bg:'bg-blue-50'}].map((m,i)=>(
                    <div key={i} className={`rounded-[24px] p-4 ${m.bg} flex flex-col items-center justify-center h-28`}>
                        <span className={`font-bold text-[10px] uppercase mb-1 ${m.c}`}>{m.l}</span>
                        <span className="text-xl font-bold">{m.v}g</span>
@@ -198,12 +246,12 @@ const App: React.FC = () => {
             <h3 className="font-bold mb-4 text-lg">Recent Meals</h3>
             <div className="space-y-3">
               {scans.length === 0 ? 
-                <div onClick={()=>fileInputRef.current?.click()} className="text-center text-gray-400 py-12 border-2 border-dashed rounded-[24px] cursor-pointer hover:bg-gray-50">
+                <div onClick={()=>fileInputRef.current?.click()} className="text-center text-gray-400 py-12 border-2 border-dashed rounded-[24px] cursor-pointer hover:bg-gray-50 transition-colors">
                   <Camera className="mx-auto mb-2 opacity-50"/>
                   Tap to scan your first meal
                 </div> : 
-                scans.map(s => (
-                  <div key={s.id} onClick={()=>{setAnalysis(s); setView('analysis')}} className="bg-white p-3 rounded-[24px] flex gap-4 shadow-card items-center cursor-pointer">
+                scans.slice(0, 5).map(s => (
+                  <div key={s.id} onClick={()=>{setAnalysis(s); setView('analysis')}} className="bg-white p-3 rounded-[24px] flex gap-4 shadow-card items-center cursor-pointer transition-transform hover:scale-[1.01]">
                     <img src={s.imageUrl} className="w-16 h-16 rounded-2xl object-cover" />
                     <div>
                       <div className="font-bold text-sm">{s.foodName}</div>
@@ -219,12 +267,12 @@ const App: React.FC = () => {
 
         {view === 'analysis' && (
           isAnalyzing ? (
-            <div className="h-[60vh] flex flex-col items-center justify-center">
+            <div className="h-[80vh] flex flex-col items-center justify-center">
               <div className="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin mb-4"></div>
               <h2 className="text-xl font-bold">Analyzing Meal...</h2>
             </div>
           ) : analysis && (
-            <div className="pt-6 animate-fade-in">
+            <div className="pt-6 animate-fade-in pb-32">
               <button onClick={()=>setView('home')} className="mb-4 p-2 bg-white rounded-full shadow-sm"><ArrowLeft size={20}/></button>
               <div className="bg-white rounded-[32px] overflow-hidden shadow-card">
                 <img src={analysis.imageUrl} className="w-full h-56 object-cover" />
@@ -248,7 +296,8 @@ const App: React.FC = () => {
                       <div className="font-bold">{analysis.fat}g</div>
                     </div>
                   </div>
-                  <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                  <div className="bg-gray-50 p-5 rounded-[24px] border border-gray-100">
+                    <h4 className="font-bold text-sm mb-2">Dr Foodie's Analysis</h4>
                     <p className="text-sm italic text-gray-600">"{analysis.microAnalysis}"</p>
                   </div>
                 </div>
@@ -257,21 +306,29 @@ const App: React.FC = () => {
           )
         )}
 
+        {view === 'stats' && renderStats()}
+
         {view === 'workouts' && (
-          <div className="pt-6 animate-fade-in text-center">
-            <Dumbbell size={48} className="mx-auto mb-4 opacity-20" />
-            <h2 className="text-2xl font-bold mb-2">Workout Plan</h2>
-            <p className="text-gray-500 mb-6">Personalized AI workout routines coming soon for Pro users.</p>
-            {!profile.isPremium && (
-              <button onClick={()=>setShowPremium(true)} className="w-full bg-black text-white p-4 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2">
-                <Crown size={20} className="text-yellow-400 fill-yellow-400"/> Upgrade for ₹49
+          <div className="pt-6 animate-fade-in text-center pb-32 px-4">
+            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Dumbbell size={40} className="text-gray-400" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Pro Workout Plans</h2>
+            <p className="text-gray-500 mb-8">Personalized routines generated by AI to reach your {profile.targetWeight}kg goal.</p>
+            {!profile.isPremium ? (
+              <button onClick={()=>setShowPremium(true)} className="w-full bg-black text-white p-5 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2">
+                <Crown size={20} className="text-yellow-400 fill-yellow-400"/> Upgrade for ₹49/mo
               </button>
+            ) : (
+              <div className="p-6 bg-white rounded-3xl border border-dashed border-gray-200 text-gray-400">
+                Your custom AI plan is being generated. Check back in a few minutes!
+              </div>
             )}
           </div>
         )}
 
         {view === 'settings' && (
-          <div className="pt-6 animate-fade-in">
+          <div className="pt-6 animate-fade-in pb-32">
             <h1 className="text-2xl font-bold mb-6">Settings</h1>
             <div className="bg-white rounded-[32px] overflow-hidden shadow-card p-4 space-y-2">
               <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-[20px] mb-4">
@@ -281,13 +338,13 @@ const App: React.FC = () => {
                   <div className="text-xs text-gray-500">{profile.isPremium ? 'Pro Member' : 'Free Member'}</div>
                 </div>
               </div>
-              <button onClick={()=>setProfile(null)} className="w-full p-4 text-left font-medium flex justify-between hover:bg-gray-50 rounded-xl">
+              <button onClick={()=>setProfile(null)} className="w-full p-4 text-left font-medium flex justify-between hover:bg-gray-50 rounded-xl transition-colors">
                 <span className="flex gap-3"><User size={20}/> Edit Profile</span> <ChevronRight size={18} className="text-gray-300"/>
               </button>
-              <button onClick={()=>setShowPremium(true)} className="w-full p-4 text-left font-medium flex justify-between hover:bg-gray-50 rounded-xl">
+              <button onClick={()=>setShowPremium(true)} className="w-full p-4 text-left font-medium flex justify-between hover:bg-gray-50 rounded-xl transition-colors">
                 <span className="flex gap-3"><Crown size={20}/> Subscription</span> <ChevronRight size={18} className="text-gray-300"/>
               </button>
-              <button onClick={()=>signOut(auth)} className="w-full p-4 text-left font-medium text-red-500 hover:bg-red-50 rounded-xl flex gap-3">
+              <button onClick={()=>signOut(auth)} className="w-full p-4 text-left font-medium text-red-500 hover:bg-red-50 rounded-xl flex gap-3 transition-colors">
                 <LogOut size={20}/> Sign Out
               </button>
             </div>
@@ -296,12 +353,20 @@ const App: React.FC = () => {
       </div>
 
       {view !== 'analysis' && (
-        <nav className="absolute bottom-0 left-0 right-0 bg-white border-t p-4 pb-8 flex justify-between items-center z-40">
-          <button onClick={()=>setView('home')} className={`flex flex-col items-center gap-1 ${view==='home'?'text-black':'text-gray-400'}`}><Home size={24}/><span className="text-[10px]">Home</span></button>
-          <button onClick={()=>setView('workouts')} className={`flex flex-col items-center gap-1 ${view==='workouts'?'text-black':'text-gray-400'}`}><Dumbbell size={24}/><span className="text-[10px]">Workouts</span></button>
-          <button onClick={()=>fileInputRef.current?.click()} className="w-14 h-14 bg-black rounded-full flex items-center justify-center text-white -mt-12 border-4 border-[#F2F2F7] shadow-xl"><Plus size={28}/></button>
-          <button onClick={()=>setView('stats')} className={`flex flex-col items-center gap-1 ${view==='stats'?'text-black':'text-gray-400'}`}><BarChart2 size={24}/><span className="text-[10px]">Stats</span></button>
-          <button onClick={()=>setView('settings')} className={`flex flex-col items-center gap-1 ${view==='settings'?'text-black':'text-gray-400'}`}><Settings size={24}/><span className="text-[10px]">Settings</span></button>
+        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 pb-8 flex justify-between items-center z-40 max-w-md mx-auto shadow-floating">
+          <button onClick={()=>setView('home')} className={`flex flex-col items-center gap-1 transition-colors ${view==='home'?'text-black':'text-gray-400'}`}><Home size={24}/><span className="text-[10px] font-bold">Home</span></button>
+          
+          <button onClick={()=>setView('workouts')} className={`flex flex-col items-center gap-1 transition-colors ${view==='workouts'?'text-black':'text-gray-400'}`}><Dumbbell size={24}/><span className="text-[10px] font-bold">Plan</span></button>
+          
+          <div className="relative -mt-12">
+            <button onClick={()=>fileInputRef.current?.click()} className="w-16 h-16 bg-black rounded-full flex items-center justify-center text-white border-4 border-[#F2F2F7] shadow-xl hover:scale-105 transition-transform active:scale-95">
+              <Plus size={32}/>
+            </button>
+          </div>
+
+          <button onClick={()=>setView('stats')} className={`flex flex-col items-center gap-1 transition-colors ${view==='stats'?'text-black':'text-gray-400'}`}><BarChart2 size={24}/><span className="text-[10px] font-bold">Stats</span></button>
+          
+          <button onClick={()=>setView('settings')} className={`flex flex-col items-center gap-1 transition-colors ${view==='settings'?'text-black':'text-gray-400'}`}><Settings size={24}/><span className="text-[10px] font-bold">Settings</span></button>
         </nav>
       )}
 
