@@ -1,8 +1,8 @@
 
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-// Use the full firestore module as lite version may have missing exports in this environment
-import { getFirestore } from "firebase/firestore";
+// Using firestore/lite to ensure consistent export availability in the current environment
+import { getFirestore } from "firebase/firestore/lite";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB4AVx4xPWqBtRs2GXFShiqHQNfYtaXWkU",
