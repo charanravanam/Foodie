@@ -6,8 +6,14 @@ export const analyzeFoodImage = async (
   base64Image: string,
   userProfile: UserProfile
 ): Promise<any> => {
-  // Fix: Initializing GoogleGenAI instance using the process.env.API_KEY directly as per guidelines
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  // Access API key from injected environment variable
+  const apiKey = process.env.API_KEY;
+  
+  if (!apiKey) {
+    throw new Error("Missing Gemini API Key. Ensure it is defined in Repo Secrets.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
 
   const systemPrompt = `
     You are Dr Foodie, an elite nutrition AI. 
@@ -24,7 +30,6 @@ export const analyzeFoodImage = async (
   `;
 
   try {
-    // Fix: Using ai.models.generateContent with a prompt and configuration in one call
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: {
@@ -36,7 +41,7 @@ export const analyzeFoodImage = async (
             },
           },
           {
-            text: "Analyze this meal for me.",
+            text: "Analyze this meal for Dr Foodie.",
           },
         ],
       },
@@ -48,31 +53,31 @@ export const analyzeFoodImage = async (
           properties: {
             foodName: {
               type: Type.STRING,
-              description: "Descriptive name of the food.",
+              description: "Name of the meal.",
             },
             calories: {
               type: Type.NUMBER,
-              description: "Estimated total calories.",
+              description: "Total calories.",
             },
             protein: {
               type: Type.NUMBER,
-              description: "Estimated protein in grams.",
+              description: "Protein (g).",
             },
             carbs: {
               type: Type.NUMBER,
-              description: "Estimated carbohydrates in grams.",
+              description: "Carbs (g).",
             },
             fat: {
               type: Type.NUMBER,
-              description: "Estimated fat in grams.",
+              description: "Fat (g).",
             },
             healthScore: {
               type: Type.NUMBER,
-              description: "Health rating from 1 to 10.",
+              description: "Score 1-10.",
             },
             microAnalysis: {
               type: Type.STRING,
-              description: "Personalized advice based on the user's specific body metrics and nutrition goals.",
+              description: "Advice tailored to the user's metrics.",
             },
           },
           required: ["foodName", "calories", "protein", "carbs", "fat", "healthScore", "microAnalysis"],
@@ -80,13 +85,13 @@ export const analyzeFoodImage = async (
       },
     });
 
-    // Fix: Correctly extracting generated text using the .text property as defined in the response object
+    // Access the .text property directly as per guidelines
     const text = response.text;
-    if (!text) throw new Error("Received empty text from AI.");
+    if (!text) throw new Error("AI returned empty content.");
     
     return JSON.parse(text);
   } catch (error) {
-    console.error("Gemini Analysis Error Detail:", error);
+    console.error("Gemini Error:", error);
     throw error;
   }
 };
