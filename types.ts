@@ -34,18 +34,20 @@ export interface UserProfile {
   name: string;
   age: number;
   gender: Gender;
-  height: number; // Height in cm
-  weight: number; // Current weight in kg
-  targetWeight: number; // Target weight in kg
-  durationWeeks: number; // Timeframe to achieve goal
+  height: number;
+  weight: number;
+  targetWeight: number;
+  durationWeeks: number;
   goal: Goal;
   workoutGoal?: WorkoutGoal; 
   workoutLocation?: WorkoutLocation; 
   isOnboarded: boolean;
   progressPhotos?: ProgressPhoto[];
   isPremium?: boolean;
-  dailyWaterGoal?: number; // In ml
+  dailyWaterGoal?: number;
 }
+
+export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
 
 export interface FoodAnalysis {
   foodName: string;
@@ -53,11 +55,11 @@ export interface FoodAnalysis {
   protein: number;
   carbs: number;
   fat: number;
-  healthScore: number; // 1-10
+  healthScore: number;
   microAnalysis: string;
   timestamp: string;
   imageUrl?: string;
-  mealType?: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
+  mealType: MealType;
 }
 
 export interface ScanHistoryItem extends FoodAnalysis {
