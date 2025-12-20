@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Home, BarChart2, Settings, Plus, Flame, ChevronRight, ArrowLeft,
@@ -10,18 +9,19 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
   AreaChart, Area, CartesianGrid
 } from 'recharts';
+// Fixing Firebase Auth imports and type definitions to resolve resolution errors
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import type { User as FirebaseUser } from 'firebase/auth';
+// Fixing Firebase Firestore imports to resolve member resolution errors
+import { 
+  doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc 
+} from 'firebase/firestore';
 import Onboarding from './components/Onboarding';
 import PremiumModal from './components/PremiumModal';
 import Auth from './components/Auth';
 import { UserProfile, ScanHistoryItem, Gender, Goal } from './types';
 import { analyzeFoodImage } from './services/geminiService';
 import { auth, db } from './services/firebase';
-// Correctly importing standard Firebase modular functions and separating type imports for environment compatibility
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import type { User as FirebaseUser } from 'firebase/auth';
-import { 
-  doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc 
-} from 'firebase/firestore';
 
 const MAX_FREE_SCANS = 3;
 
@@ -136,6 +136,9 @@ const App: React.FC = () => {
 
   const getWorkouts = (): any[] => {
     if (!profile) return [];
+    
+    // Exercise Library with GIFs
+    // Note: Using direct GIF links where possible for immediate visual impact
     if (profile.goal === Goal.LOSE_WEIGHT) return [
       { 
         name: "Metabolic HIIT", 
@@ -144,6 +147,7 @@ const App: React.FC = () => {
         tag: "FAT BURN", 
         icon: <Flame className="text-orange-500" size={18}/>,
         img: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80",
+        gifUrl: "https://fitnessprogramer.com/wp-content/uploads/2021/02/HIIT.gif",
         desc: "High-intensity bursts to maximize calorie afterburn for up to 24 hours."
       },
       { 
@@ -153,6 +157,7 @@ const App: React.FC = () => {
         tag: "INSULIN", 
         icon: <Activity className="text-blue-500" size={18}/>,
         img: "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=800&q=80",
+        gifUrl: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHJidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKp56t61Fv6v6rO/giphy.gif",
         desc: "Low-impact aerobic movement optimized for fat oxidation and glucose stability."
       },
       { 
@@ -162,6 +167,7 @@ const App: React.FC = () => {
         tag: "ABS", 
         icon: <CheckCircle2 className="text-green-500" size={18}/>,
         img: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80",
+        gifUrl: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKSj0G5W1z1f1wM/giphy.gif",
         desc: "Focused abdominal engagement to improve posture and visceral fat reduction."
       },
       { 
@@ -171,6 +177,7 @@ const App: React.FC = () => {
         tag: "RECOVERY", 
         icon: <Clock className="text-teal-500" size={18}/>,
         img: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80",
+        gifUrl: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKp56t61Fv6v6rO/giphy.gif",
         desc: "Clinical stretching to reduce inflammation and maintain joint health."
       }
     ];
@@ -182,6 +189,7 @@ const App: React.FC = () => {
         tag: "STRENGTH", 
         icon: <Zap className="text-yellow-500" size={18}/>,
         img: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80",
+        gifUrl: "https://fitnessprogramer.com/wp-content/uploads/2021/06/Cross-Arm-Push-Up.gif",
         desc: "Heavy compound movements focusing on chest, shoulders, and triceps."
       },
       { 
@@ -191,6 +199,7 @@ const App: React.FC = () => {
         tag: "POWER", 
         icon: <Trophy className="text-red-500" size={18}/>,
         img: "https://images.unsplash.com/photo-1534258936925-c58bed479fcb?w=800&q=80",
+        gifUrl: "https://media.tenor.com/gI9jz9Pz_3IAAAAC/squat-exercise.gif",
         desc: "Lower body mastery to trigger maximum anabolic hormone release."
       },
       { 
@@ -200,6 +209,7 @@ const App: React.FC = () => {
         tag: "BACK", 
         icon: <TrendingUp className="text-indigo-500" size={18}/>,
         img: "https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=800&q=80",
+        gifUrl: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKp56t61Fv6v6rO/giphy.gif",
         desc: "Deadlifts and rows to build a thick, metabolic-demanding back."
       },
       { 
@@ -209,6 +219,7 @@ const App: React.FC = () => {
         tag: "PUMP", 
         icon: <Activity className="text-pink-500" size={18}/>,
         img: "https://images.unsplash.com/photo-1581009146145-b5ef03a94e77?w=800&q=80",
+        gifUrl: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKp56t61Fv6v6rO/giphy.gif",
         desc: "High volume isolation work to maximize sarcoplasmic hypertrophy."
       }
     ];
@@ -220,6 +231,7 @@ const App: React.FC = () => {
         tag: "BALANCE", 
         icon: <Activity className="text-indigo-500" size={18}/>,
         img: "https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?w=800&q=80",
+        gifUrl: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKp56t61Fv6v6rO/giphy.gif",
         desc: "Balanced movement addressing all major muscle groups for overall vitality."
       },
       { 
@@ -229,6 +241,7 @@ const App: React.FC = () => {
         tag: "HEART", 
         icon: <Activity className="text-blue-400" size={18}/>,
         img: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=800&q=80",
+        gifUrl: "https://fitnessprogramer.com/wp-content/uploads/2021/02/Jogging.gif",
         desc: "Low-intensity cardiovascular work to improve mitochondrial density."
       },
       { 
@@ -238,6 +251,7 @@ const App: React.FC = () => {
         tag: "MIND", 
         icon: <Clock className="text-purple-400" size={18}/>,
         img: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80",
+        gifUrl: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidTRidSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKp56t61Fv6v6rO/giphy.gif",
         desc: "Vinyasa flow to improve flexibility and reduce cortisol levels."
       }
     ];
@@ -331,7 +345,7 @@ const App: React.FC = () => {
                 <h1 className="text-3xl font-bold tracking-tighter">Movement</h1>
                 <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Bio-Adaptive Routines</p>
               </div>
-              {profile.isPremium && <Crown size={20} className="text-yellow-500 mb-1 fill-yellow-400"/>}
+              {profile.isPremium && <Crown size={20} className="text-yellow-500 mb-1 fill-yellow-500"/>}
             </header>
 
             {!profile.isPremium ? (
@@ -347,7 +361,6 @@ const App: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Daily Readiness Meter */}
                 <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-100 relative overflow-hidden">
                    <div className="flex justify-between items-center mb-4">
                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Training Readiness</span>
@@ -364,7 +377,6 @@ const App: React.FC = () => {
                    </p>
                 </div>
 
-                {/* Primary Session Card - Now Interactive with Image */}
                 <div 
                   onClick={() => setActiveWorkout(getWorkouts()[0])}
                   className="bg-black text-white rounded-[40px] shadow-2xl relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-all h-64"
@@ -394,7 +406,6 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Workout Grid - Reframed with Images */}
                 <div className="px-1 pt-2">
                    <h4 className="text-lg font-bold tracking-tight mb-4">Adaptive Library</h4>
                    <div className="grid grid-cols-2 gap-4">
@@ -441,70 +452,82 @@ const App: React.FC = () => {
         {/* WORKOUT SESSION OVERLAY */}
         {activeWorkout && (
           <div className="fixed inset-0 z-[60] bg-white animate-fade-in flex flex-col">
-            <div className="relative h-2/5">
-              <img src={activeWorkout.img} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-black/30"></div>
+            <div className="relative h-[45%] bg-black">
+              <img 
+                src={activeWorkout.gifUrl || activeWorkout.img} 
+                className="w-full h-full object-contain" 
+                alt="Exercise Demonstration"
+              />
+              <div className="absolute top-12 left-6">
+                <span className="bg-green-500 text-white text-[10px] font-black px-2 py-1 rounded uppercase tracking-[0.2em] shadow-lg flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div> Demonstration
+                </span>
+              </div>
               <button 
                 onClick={() => setActiveWorkout(null)} 
-                className="absolute top-12 right-6 p-2 bg-white/20 backdrop-blur-md rounded-full text-white border border-white/20"
+                className="absolute top-12 right-6 p-2 bg-white/20 backdrop-blur-md rounded-full text-white border border-white/20 shadow-xl"
               >
                 <X size={24}/>
               </button>
-              <div className="absolute bottom-6 left-6 pr-6">
+            </div>
+            
+            <div className="flex-1 p-8 bg-white flex flex-col -mt-8 rounded-t-[40px] shadow-[0_-20px_50px_rgba(0,0,0,0.1)] z-10">
+              <div className="mb-6">
                 <span className="bg-black text-white text-[10px] font-black px-2 py-1 rounded uppercase tracking-[0.2em] mb-3 inline-block">{activeWorkout.tag}</span>
                 <h2 className="text-4xl font-bold tracking-tighter text-black">{activeWorkout.name}</h2>
               </div>
-            </div>
-            
-            <div className="flex-1 p-8 bg-white flex flex-col">
+
               <div className="grid grid-cols-3 gap-4 mb-8">
-                <div className="bg-gray-50 p-4 rounded-3xl text-center">
+                <div className="bg-gray-50 p-4 rounded-3xl text-center border border-gray-100 shadow-sm">
                   <Timer size={18} className="mx-auto mb-2 text-gray-400" />
                   <div className="text-sm font-black">{activeWorkout.dur}</div>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-3xl text-center">
+                <div className="bg-orange-50 p-4 rounded-3xl text-center border border-orange-100 shadow-sm">
                   <Flame size={18} className="mx-auto mb-2 text-orange-500" />
                   <div className="text-sm font-black">{activeWorkout.level}</div>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-3xl text-center">
+                <div className="bg-blue-50 p-4 rounded-3xl text-center border border-blue-100 shadow-sm">
                   <Activity size={18} className="mx-auto mb-2 text-blue-500" />
-                  <div className="text-sm font-black">AI Lead</div>
+                  <div className="text-sm font-black">Clinical</div>
                 </div>
               </div>
 
               <div className="space-y-6 flex-1">
-                <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-gray-400">Clinical Protocol</h4>
-                <p className="text-gray-600 font-medium leading-relaxed italic">"{activeWorkout.desc}"</p>
+                <div className="flex items-center gap-2 mb-1">
+                   <Info size={14} className="text-gray-400"/>
+                   <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-gray-400">Exercise Protocol</h4>
+                </div>
+                <p className="text-gray-600 font-medium leading-relaxed italic border-l-4 border-gray-100 pl-4">"{activeWorkout.desc}"</p>
                 
-                <div className="bg-black/5 p-6 rounded-[32px] border border-black/5">
+                <div className="bg-gray-50 p-6 rounded-[32px] border border-gray-100 shadow-inner">
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center font-bold">1</div>
-                    <div className="font-bold">Preparation & Activation</div>
+                    <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center font-black shadow-lg">1</div>
+                    <div className="font-bold">Follow demo for 45s</div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-gray-200 text-gray-400 rounded-full flex items-center justify-center font-bold">2</div>
-                    <div className="font-bold text-gray-400">Primary Stimulus Phase</div>
+                    <div className="w-10 h-10 bg-white text-gray-400 rounded-full flex items-center justify-center font-black border border-gray-200">2</div>
+                    <div className="font-bold text-gray-400">Rest for 15s</div>
                   </div>
                 </div>
               </div>
 
               <div className="pt-8 space-y-3">
                 <div className="flex gap-3">
-                  <button className="flex-1 bg-gray-100 p-5 rounded-3xl flex items-center justify-center">
+                  <button className="flex-1 bg-gray-50 p-5 rounded-3xl flex items-center justify-center border border-gray-100 hover:bg-gray-100 transition-colors shadow-sm">
                     <SkipForward size={24} className="text-gray-400"/>
                   </button>
-                  <button className="w-2/3 bg-black text-white p-5 rounded-3xl font-black text-lg flex items-center justify-center gap-3 shadow-xl">
+                  <button className="w-2/3 bg-black text-white p-5 rounded-3xl font-black text-lg flex items-center justify-center gap-3 shadow-2xl transition-transform active:scale-95">
                     <Pause size={24} fill="currentColor"/> PAUSE
                   </button>
                 </div>
                 <button 
                   onClick={() => {
                     setActiveWorkout(null);
-                    alert("Workout Logged! Metabolism boosted.");
+                    alert("Training Session Successfully Logged!");
                   }}
-                  className="w-full text-[10px] font-black uppercase tracking-[0.2em] text-green-600 py-4"
+                  className="w-full text-[10px] font-black uppercase tracking-[0.2em] text-green-600 py-4 hover:bg-green-50 rounded-2xl transition-colors"
                 >
-                  End & Log Session
+                  Complete & Log Workout
                 </button>
               </div>
             </div>

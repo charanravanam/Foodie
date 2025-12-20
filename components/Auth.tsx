@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { auth } from '../services/firebase';
-// Fix: Use standard firebase/auth modular imports for v9+ compatibility
+// Fixing modular imports for Auth functions to resolve member resolution issues
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 
@@ -25,7 +24,7 @@ const Auth = () => {
       }
     } catch (err: any) {
       console.error("Auth Error:", err);
-      // Fix: Accessing 'code' from error object by casting to any, as AuthError interface may not expose it consistently in all environments
+      // Accessing 'code' from error object by casting to any to ensure broad compatibility across environments
       const firebaseError = err as any;
       let msg = "An unexpected error occurred. Please try again.";
       

@@ -1,7 +1,5 @@
-
 import { initializeApp } from 'firebase/app';
-// Use standard modular paths for Auth and Firestore
-// Correctly importing modular functions from subpackages
+// Fixing Firebase Auth and Firestore exports for modular SDK by using direct submodule paths
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 

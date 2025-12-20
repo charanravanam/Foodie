@@ -14,6 +14,7 @@ export const analyzeFoodImage = async (
   userProfile: UserProfile,
   mimeType: string = "image/jpeg"
 ): Promise<any> => {
+  // Always initialize GoogleGenAI with a named parameter
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const systemPrompt = `
@@ -31,8 +32,9 @@ export const analyzeFoodImage = async (
   let lastError: any;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
+      // Use gemini-3-pro-preview for complex reasoning and clinical metabolic analysis
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3-pro-preview",
         contents: {
           parts: [
             { inlineData: { mimeType, data: base64Image } },
@@ -59,11 +61,13 @@ export const analyzeFoodImage = async (
         },
       });
 
+      // Directly access .text property from response
       const text = response.text?.trim();
       if (!text) throw new Error("Empty AI response");
       return JSON.parse(text);
     } catch (error: any) {
       lastError = error;
+      // Implement robust handling for API errors and unexpected responses
       if ((error?.status === 429 || error?.status === 503) && attempt < MAX_RETRIES - 1) {
         await sleep(INITIAL_RETRY_DELAY * Math.pow(2, attempt));
         continue;
