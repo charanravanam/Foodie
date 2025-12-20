@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { auth } from '../services/firebase';
-// Fix: Use standard firebase/auth modular imports
+// Fix: Use standard firebase/auth modular imports for v9+ compatibility
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 

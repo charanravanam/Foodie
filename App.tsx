@@ -4,21 +4,24 @@ import {
   Home, BarChart2, Settings, Plus, Flame, ChevronRight, ArrowLeft,
   Camera, User, Dumbbell, LogOut, Crown, Loader2, TrendingUp,
   Apple, Target, Zap, Star, Activity, Droplets, Calendar, Clock,
-  Trophy, CheckCircle2, Info, Timer, ZapOff, Play
+  Trophy, CheckCircle2, Info, Timer, ZapOff, Play, X, Pause, SkipForward
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
-  PieChart, Pie, AreaChart, Area, CartesianGrid
+  AreaChart, Area, CartesianGrid
 } from 'recharts';
 import Onboarding from './components/Onboarding';
 import PremiumModal from './components/PremiumModal';
 import Auth from './components/Auth';
-import { UserProfile, ScanHistoryItem, Gender, Goal, Exercise } from './types';
+import { UserProfile, ScanHistoryItem, Gender, Goal } from './types';
 import { analyzeFoodImage } from './services/geminiService';
 import { auth, db } from './services/firebase';
-// Fix: Use standard firebase/auth and firebase/firestore modular paths and type-safe imports
-import { onAuthStateChanged, signOut, type User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc } from 'firebase/firestore';
+// Correctly importing standard Firebase modular functions and separating type imports for environment compatibility
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import type { User as FirebaseUser } from 'firebase/auth';
+import { 
+  doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc 
+} from 'firebase/firestore';
 
 const MAX_FREE_SCANS = 3;
 
@@ -26,6 +29,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [view, setView] = useState<'home' | 'workouts' | 'stats' | 'settings' | 'analysis'>('home');
+  const [activeWorkout, setActiveWorkout] = useState<any | null>(null);
   const [scans, setScans] = useState<ScanHistoryItem[]>([]);
   const [showPremium, setShowPremium] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -133,21 +137,109 @@ const App: React.FC = () => {
   const getWorkouts = (): any[] => {
     if (!profile) return [];
     if (profile.goal === Goal.LOSE_WEIGHT) return [
-      { name: "Metabolic HIIT", dur: "20m", level: "High", tag: "FAT BURN", icon: <Flame className="text-orange-500" size={18}/> },
-      { name: "Fasted Walk", dur: "45m", level: "Low", tag: "INSULIN", icon: <Activity className="text-blue-500" size={18}/> },
-      { name: "Core Compression", dur: "15m", level: "Med", tag: "ABS", icon: <CheckCircle2 className="text-green-500" size={18}/> },
-      { name: "Daily Mobility", dur: "10m", level: "Low", tag: "RECOVERY", icon: <Clock className="text-teal-500" size={18}/> }
+      { 
+        name: "Metabolic HIIT", 
+        dur: "20m", 
+        level: "High", 
+        tag: "FAT BURN", 
+        icon: <Flame className="text-orange-500" size={18}/>,
+        img: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80",
+        desc: "High-intensity bursts to maximize calorie afterburn for up to 24 hours."
+      },
+      { 
+        name: "Fasted Walk", 
+        dur: "45m", 
+        level: "Low", 
+        tag: "INSULIN", 
+        icon: <Activity className="text-blue-500" size={18}/>,
+        img: "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=800&q=80",
+        desc: "Low-impact aerobic movement optimized for fat oxidation and glucose stability."
+      },
+      { 
+        name: "Core Compression", 
+        dur: "15m", 
+        level: "Med", 
+        tag: "ABS", 
+        icon: <CheckCircle2 className="text-green-500" size={18}/>,
+        img: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80",
+        desc: "Focused abdominal engagement to improve posture and visceral fat reduction."
+      },
+      { 
+        name: "Daily Mobility", 
+        dur: "10m", 
+        level: "Low", 
+        tag: "RECOVERY", 
+        icon: <Clock className="text-teal-500" size={18}/>,
+        img: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80",
+        desc: "Clinical stretching to reduce inflammation and maintain joint health."
+      }
     ];
     if (profile.goal === Goal.GAIN_WEIGHT) return [
-      { name: "Hypertrophy Push", dur: "50m", level: "High", tag: "STRENGTH", icon: <Zap className="text-yellow-500" size={18}/> },
-      { name: "Heavy Squats", dur: "30m", level: "Elite", tag: "POWER", icon: <Trophy className="text-red-500" size={18}/> },
-      { name: "Compound Pull", dur: "45m", level: "High", tag: "BACK", icon: <TrendingUp className="text-indigo-500" size={18}/> },
-      { name: "Post-Workout Flex", dur: "10m", level: "Low", tag: "PUMP", icon: <Activity className="text-pink-500" size={18}/> }
+      { 
+        name: "Hypertrophy Push", 
+        dur: "50m", 
+        level: "High", 
+        tag: "STRENGTH", 
+        icon: <Zap className="text-yellow-500" size={18}/>,
+        img: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80",
+        desc: "Heavy compound movements focusing on chest, shoulders, and triceps."
+      },
+      { 
+        name: "Heavy Squats", 
+        dur: "30m", 
+        level: "Elite", 
+        tag: "POWER", 
+        icon: <Trophy className="text-red-500" size={18}/>,
+        img: "https://images.unsplash.com/photo-1534258936925-c58bed479fcb?w=800&q=80",
+        desc: "Lower body mastery to trigger maximum anabolic hormone release."
+      },
+      { 
+        name: "Compound Pull", 
+        dur: "45m", 
+        level: "High", 
+        tag: "BACK", 
+        icon: <TrendingUp className="text-indigo-500" size={18}/>,
+        img: "https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=800&q=80",
+        desc: "Deadlifts and rows to build a thick, metabolic-demanding back."
+      },
+      { 
+        name: "Pump Session", 
+        dur: "15m", 
+        level: "Med", 
+        tag: "PUMP", 
+        icon: <Activity className="text-pink-500" size={18}/>,
+        img: "https://images.unsplash.com/photo-1581009146145-b5ef03a94e77?w=800&q=80",
+        desc: "High volume isolation work to maximize sarcoplasmic hypertrophy."
+      }
     ];
     return [
-      { name: "Full Body Circuit", dur: "40m", level: "Med", tag: "BALANCE", icon: <Activity className="text-indigo-500" size={18}/> },
-      { name: "Zone 2 Jog", dur: "30m", level: "Low", tag: "HEART", icon: <Activity className="text-blue-400" size={18}/> },
-      { name: "Yoga Flow", dur: "25m", level: "Low", tag: "MIND", icon: <Clock className="text-purple-400" size={18}/> }
+      { 
+        name: "Full Body Circuit", 
+        dur: "40m", 
+        level: "Med", 
+        tag: "BALANCE", 
+        icon: <Activity className="text-indigo-500" size={18}/>,
+        img: "https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?w=800&q=80",
+        desc: "Balanced movement addressing all major muscle groups for overall vitality."
+      },
+      { 
+        name: "Zone 2 Jog", 
+        dur: "30m", 
+        level: "Low", 
+        tag: "HEART", 
+        icon: <Activity className="text-blue-400" size={18}/>,
+        img: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=800&q=80",
+        desc: "Low-intensity cardiovascular work to improve mitochondrial density."
+      },
+      { 
+        name: "Yoga Flow", 
+        dur: "25m", 
+        level: "Low", 
+        tag: "MIND", 
+        icon: <Clock className="text-purple-400" size={18}/>,
+        img: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80",
+        desc: "Vinyasa flow to improve flexibility and reduce cortisol levels."
+      }
     ];
   };
 
@@ -239,7 +331,7 @@ const App: React.FC = () => {
                 <h1 className="text-3xl font-bold tracking-tighter">Movement</h1>
                 <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Bio-Adaptive Routines</p>
               </div>
-              {profile.isPremium && <Crown size={20} className="text-yellow-500 mb-1 fill-yellow-500"/>}
+              {profile.isPremium && <Crown size={20} className="text-yellow-500 mb-1 fill-yellow-400"/>}
             </header>
 
             {!profile.isPremium ? (
@@ -256,14 +348,14 @@ const App: React.FC = () => {
             ) : (
               <div className="space-y-6">
                 {/* Daily Readiness Meter */}
-                <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-50 relative overflow-hidden">
+                <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-100 relative overflow-hidden">
                    <div className="flex justify-between items-center mb-4">
                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Training Readiness</span>
                       <span className="font-bold text-xs">{readiness}%</span>
                    </div>
                    <div className="h-2 w-full bg-gray-50 rounded-full overflow-hidden mb-4">
                       <div 
-                        className={`h-full transition-all duration-1000 ${readiness > 70 ? 'bg-green-500' : readiness > 40 ? 'bg-yellow-500' : 'bg-red-500'}`} 
+                        className={`h-full transition-all duration-1000 ${readiness > 70 ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : readiness > 40 ? 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.4)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.4)]'}`} 
                         style={{ width: `${readiness}%` }}
                       ></div>
                    </div>
@@ -272,23 +364,25 @@ const App: React.FC = () => {
                    </p>
                 </div>
 
-                {/* Primary Session Card */}
-                <div className="bg-black text-white p-8 rounded-[40px] shadow-2xl relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-all">
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 group-hover:scale-150 transition-all duration-700"></div>
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-6">
+                {/* Primary Session Card - Now Interactive with Image */}
+                <div 
+                  onClick={() => setActiveWorkout(getWorkouts()[0])}
+                  className="bg-black text-white rounded-[40px] shadow-2xl relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-all h-64"
+                >
+                  <img src={getWorkouts()[0].img} className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-[2s]" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+                  <div className="relative z-10 p-8 h-full flex flex-col justify-end">
+                    <div className="flex items-center gap-2 mb-4">
                        <span className="bg-yellow-400 text-black text-[9px] font-black px-2 py-1 rounded uppercase tracking-wider">Recommended Session</span>
                     </div>
                     <h3 className="text-3xl font-bold tracking-tighter mb-2">{getWorkouts()[0].name}</h3>
-                    <p className="text-white/50 text-xs font-medium mb-8 leading-relaxed">Engineered for your {profile.goal} goal. Focuses on high metabolic activation and heart rate elevation.</p>
-                    
                     <div className="flex items-center justify-between">
                        <div className="flex gap-4">
-                          <div className="flex items-center gap-1.5 opacity-60">
+                          <div className="flex items-center gap-1.5 opacity-80">
                              <Timer size={14}/>
                              <span className="text-[10px] font-black uppercase tracking-widest">{getWorkouts()[0].dur}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 opacity-60">
+                          <div className="flex items-center gap-1.5 opacity-80">
                              <Flame size={14}/>
                              <span className="text-[10px] font-black uppercase tracking-widest">{getWorkouts()[0].level}</span>
                           </div>
@@ -300,23 +394,33 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Workout Grid - Reframed 2-column Grid */}
+                {/* Workout Grid - Reframed with Images */}
                 <div className="px-1 pt-2">
-                   <h4 className="text-lg font-bold tracking-tight mb-4">Adaptive Routines</h4>
+                   <h4 className="text-lg font-bold tracking-tight mb-4">Adaptive Library</h4>
                    <div className="grid grid-cols-2 gap-4">
                       {getWorkouts().slice(1).map((w, i) => (
-                        <div key={i} className="bg-white p-5 rounded-[32px] shadow-card border border-gray-100 flex flex-col justify-between h-48 transition-all hover:translate-y-[-4px] active:scale-95 cursor-pointer group">
-                           <div className="flex justify-between items-start mb-4">
-                              <div className="p-2.5 bg-gray-50 rounded-2xl text-black group-hover:bg-black group-hover:text-white transition-colors">
-                                 {w.icon}
+                        <div 
+                          key={i} 
+                          onClick={() => setActiveWorkout(w)}
+                          className="bg-white rounded-[32px] shadow-card border border-gray-100 overflow-hidden h-52 flex flex-col transition-all hover:translate-y-[-4px] active:scale-95 cursor-pointer group"
+                        >
+                           <div className="h-28 relative">
+                              <img src={w.img} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                              <div className="absolute inset-0 bg-black/10"></div>
+                              <div className="absolute top-3 left-3">
+                                <div className="p-2 bg-white/90 backdrop-blur-md rounded-xl text-black shadow-sm">
+                                   {w.icon}
+                                </div>
                               </div>
-                              <span className="text-[8px] font-black bg-gray-100 text-gray-400 px-2 py-1 rounded uppercase tracking-widest">{w.tag}</span>
+                              <div className="absolute top-3 right-3">
+                                <span className="text-[8px] font-black bg-black/40 backdrop-blur-md text-white px-2 py-1 rounded uppercase tracking-widest">{w.tag}</span>
+                              </div>
                            </div>
-                           <div>
+                           <div className="p-4 flex-1 flex flex-col justify-between">
                               <div className="font-bold text-sm tracking-tight mb-1">{w.name}</div>
                               <div className="flex items-center gap-2 text-gray-400">
                                  <span className="text-[9px] font-black uppercase tracking-widest">{w.dur}</span>
-                                 <div className="w-1 h-1 bg-gray-200 rounded-full"></div>
+                                 <div className="w-0.5 h-0.5 bg-gray-300 rounded-full"></div>
                                  <span className="text-[9px] font-black uppercase tracking-widest">{w.level}</span>
                               </div>
                            </div>
@@ -325,13 +429,85 @@ const App: React.FC = () => {
                    </div>
                 </div>
 
-                {/* Adaptive Disclaimer */}
                 <div className="mt-8 p-6 bg-gray-50 rounded-[32px] border border-dashed border-gray-200 text-center">
-                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Dr Foodie Protocol v2.2</p>
+                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Dr Foodie Protocol v2.3</p>
                    <p className="text-[9px] text-gray-300 font-medium">Workouts refresh based on daily nutrient density and goal adherence.</p>
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* WORKOUT SESSION OVERLAY */}
+        {activeWorkout && (
+          <div className="fixed inset-0 z-[60] bg-white animate-fade-in flex flex-col">
+            <div className="relative h-2/5">
+              <img src={activeWorkout.img} className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-black/30"></div>
+              <button 
+                onClick={() => setActiveWorkout(null)} 
+                className="absolute top-12 right-6 p-2 bg-white/20 backdrop-blur-md rounded-full text-white border border-white/20"
+              >
+                <X size={24}/>
+              </button>
+              <div className="absolute bottom-6 left-6 pr-6">
+                <span className="bg-black text-white text-[10px] font-black px-2 py-1 rounded uppercase tracking-[0.2em] mb-3 inline-block">{activeWorkout.tag}</span>
+                <h2 className="text-4xl font-bold tracking-tighter text-black">{activeWorkout.name}</h2>
+              </div>
+            </div>
+            
+            <div className="flex-1 p-8 bg-white flex flex-col">
+              <div className="grid grid-cols-3 gap-4 mb-8">
+                <div className="bg-gray-50 p-4 rounded-3xl text-center">
+                  <Timer size={18} className="mx-auto mb-2 text-gray-400" />
+                  <div className="text-sm font-black">{activeWorkout.dur}</div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-3xl text-center">
+                  <Flame size={18} className="mx-auto mb-2 text-orange-500" />
+                  <div className="text-sm font-black">{activeWorkout.level}</div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-3xl text-center">
+                  <Activity size={18} className="mx-auto mb-2 text-blue-500" />
+                  <div className="text-sm font-black">AI Lead</div>
+                </div>
+              </div>
+
+              <div className="space-y-6 flex-1">
+                <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-gray-400">Clinical Protocol</h4>
+                <p className="text-gray-600 font-medium leading-relaxed italic">"{activeWorkout.desc}"</p>
+                
+                <div className="bg-black/5 p-6 rounded-[32px] border border-black/5">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center font-bold">1</div>
+                    <div className="font-bold">Preparation & Activation</div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-gray-200 text-gray-400 rounded-full flex items-center justify-center font-bold">2</div>
+                    <div className="font-bold text-gray-400">Primary Stimulus Phase</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-8 space-y-3">
+                <div className="flex gap-3">
+                  <button className="flex-1 bg-gray-100 p-5 rounded-3xl flex items-center justify-center">
+                    <SkipForward size={24} className="text-gray-400"/>
+                  </button>
+                  <button className="w-2/3 bg-black text-white p-5 rounded-3xl font-black text-lg flex items-center justify-center gap-3 shadow-xl">
+                    <Pause size={24} fill="currentColor"/> PAUSE
+                  </button>
+                </div>
+                <button 
+                  onClick={() => {
+                    setActiveWorkout(null);
+                    alert("Workout Logged! Metabolism boosted.");
+                  }}
+                  className="w-full text-[10px] font-black uppercase tracking-[0.2em] text-green-600 py-4"
+                >
+                  End & Log Session
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -534,13 +710,13 @@ const App: React.FC = () => {
               </button>
             </div>
             <div className="text-center">
-               <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Dr Foodie v1.5.2 • Elite Protocol</p>
+               <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Dr Foodie v1.5.3 • Elite Protocol</p>
             </div>
           </div>
         )}
       </div>
 
-      {view !== 'analysis' && (
+      {view !== 'analysis' && !activeWorkout && (
         <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-2xl border-t border-gray-100 p-4 pb-10 flex justify-between items-center z-40 max-w-md mx-auto shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-8">
           <button onClick={()=>setView('home')} className={`transition-all duration-300 ${view==='home'?'text-black scale-125 shadow-black/5':'text-gray-300 hover:text-gray-500'}`}><Home size={22} strokeWidth={view==='home'?3:2}/></button>
           <button onClick={()=>setView('workouts')} className={`transition-all duration-300 ${view==='workouts'?'text-black scale-125':'text-gray-300 hover:text-gray-500'}`}><Dumbbell size={22} strokeWidth={view==='workouts'?3:2}/></button>

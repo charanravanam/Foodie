@@ -1,8 +1,9 @@
 
-import { initializeApp } from "firebase/app";
+import { initializeApp } from 'firebase/app';
 // Use standard modular paths for Auth and Firestore
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+// Correctly importing modular functions from subpackages
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyB4AVx4xPWqBtRs2GXFShiqHQNfYtaXWkU",
