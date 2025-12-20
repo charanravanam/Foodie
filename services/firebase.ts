@@ -1,8 +1,8 @@
 
 import { initializeApp } from "firebase/app";
+// Use standard modular paths for Auth and Firestore
 import { getAuth } from "firebase/auth";
-// Switched to firebase/firestore/lite to ensure consistent modular exports in this environment
-import { getFirestore } from "firebase/firestore/lite";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB4AVx4xPWqBtRs2GXFShiqHQNfYtaXWkU",

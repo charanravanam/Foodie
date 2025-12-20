@@ -4,7 +4,7 @@ import {
   Home, BarChart2, Settings, Plus, Flame, ChevronRight, ArrowLeft,
   Camera, User, Dumbbell, LogOut, Crown, Loader2, TrendingUp,
   Apple, Target, Zap, Star, Activity, Droplets, Calendar, Clock,
-  Trophy, CheckCircle2, Info
+  Trophy, CheckCircle2, Info, Timer, ZapOff, Play
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
@@ -16,8 +16,9 @@ import Auth from './components/Auth';
 import { UserProfile, ScanHistoryItem, Gender, Goal, Exercise } from './types';
 import { analyzeFoodImage } from './services/geminiService';
 import { auth, db } from './services/firebase';
-import { onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc } from 'firebase/firestore/lite';
+// Fix: Use standard firebase/auth and firebase/firestore modular paths and type-safe imports
+import { onAuthStateChanged, signOut, type User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc } from 'firebase/firestore';
 
 const MAX_FREE_SCANS = 3;
 
@@ -132,34 +133,31 @@ const App: React.FC = () => {
   const getWorkouts = (): any[] => {
     if (!profile) return [];
     if (profile.goal === Goal.LOSE_WEIGHT) return [
-      { name: "Metabolic HIIT", dur: "20m", level: "High", icon: <Flame className="text-orange-500" size={16}/> },
-      { name: "Fasted Walk", dur: "45m", level: "Low", icon: <Activity className="text-blue-500" size={16}/> },
-      { name: "Core Compression", dur: "15m", level: "Med", icon: <CheckCircle2 className="text-green-500" size={16}/> }
+      { name: "Metabolic HIIT", dur: "20m", level: "High", tag: "FAT BURN", icon: <Flame className="text-orange-500" size={18}/> },
+      { name: "Fasted Walk", dur: "45m", level: "Low", tag: "INSULIN", icon: <Activity className="text-blue-500" size={18}/> },
+      { name: "Core Compression", dur: "15m", level: "Med", tag: "ABS", icon: <CheckCircle2 className="text-green-500" size={18}/> },
+      { name: "Daily Mobility", dur: "10m", level: "Low", tag: "RECOVERY", icon: <Clock className="text-teal-500" size={18}/> }
     ];
     if (profile.goal === Goal.GAIN_WEIGHT) return [
-      { name: "Hypertrophy Push", dur: "50m", level: "High", icon: <Zap className="text-yellow-500" size={16}/> },
-      { name: "Heavy Squats", dur: "30m", level: "Elite", icon: <Trophy className="text-red-500" size={16}/> },
-      { name: "Recovery Stretch", dur: "15m", level: "Low", icon: <Activity className="text-teal-500" size={16}/> }
+      { name: "Hypertrophy Push", dur: "50m", level: "High", tag: "STRENGTH", icon: <Zap className="text-yellow-500" size={18}/> },
+      { name: "Heavy Squats", dur: "30m", level: "Elite", tag: "POWER", icon: <Trophy className="text-red-500" size={18}/> },
+      { name: "Compound Pull", dur: "45m", level: "High", tag: "BACK", icon: <TrendingUp className="text-indigo-500" size={18}/> },
+      { name: "Post-Workout Flex", dur: "10m", level: "Low", tag: "PUMP", icon: <Activity className="text-pink-500" size={18}/> }
     ];
     return [
-      { name: "Full Body Circuit", dur: "40m", level: "Med", icon: <Activity className="text-indigo-500" size={16}/> },
-      { name: "Zone 2 Jog", dur: "30m", level: "Low", icon: <Activity className="text-blue-400" size={16}/> }
+      { name: "Full Body Circuit", dur: "40m", level: "Med", tag: "BALANCE", icon: <Activity className="text-indigo-500" size={18}/> },
+      { name: "Zone 2 Jog", dur: "30m", level: "Low", tag: "HEART", icon: <Activity className="text-blue-400" size={18}/> },
+      { name: "Yoga Flow", dur: "25m", level: "Low", tag: "MIND", icon: <Clock className="text-purple-400" size={18}/> }
     ];
   };
-
-  if (loading) return (
-    <div className="h-screen flex flex-col items-center justify-center bg-white">
-      <Loader2 className="animate-spin text-black mb-4" size={40} />
-      <p className="text-gray-400 font-black uppercase tracking-widest text-[10px]">Syncing Clinical Records...</p>
-    </div>
-  );
-
-  if (!user) return <Auth />;
-  if (!profile || !profile.isOnboarded) return <Onboarding onComplete={saveProfile} initialData={profile} />;
 
   const todayScans = scans.filter(s => new Date(s.timestamp).toDateString() === new Date().toDateString());
   const todayCalories = todayScans.reduce((a, b) => a + b.calories, 0);
   const targetCals = getCalorieTarget();
+  const readiness = Math.min(100, Math.round((todayCalories / (targetCals || 1)) * 100));
+
+  if (!user) return <Auth />;
+  if (!profile || !profile.isOnboarded) return <Onboarding onComplete={saveProfile} initialData={profile} />;
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-[#F2F2F7] text-black relative shadow-2xl overflow-hidden flex flex-col font-sans">
@@ -187,7 +185,6 @@ const App: React.FC = () => {
               <Activity className="text-black relative z-10" size={32} />
             </div>
 
-            {/* Pro Only Metabolic Window */}
             {profile.isPremium && (
               <div className="bg-gradient-to-br from-zinc-900 to-black p-5 rounded-[32px] mb-6 text-white relative overflow-hidden border border-white/5 shadow-xl">
                 <div className="absolute top-0 right-0 p-4 opacity-20"><Zap className="text-yellow-400" size={48} /></div>
@@ -235,6 +232,109 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {view === 'workouts' && (
+          <div className="pt-6 animate-fade-in pb-12">
+            <header className="flex justify-between items-end mb-8 px-1">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tighter">Movement</h1>
+                <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Bio-Adaptive Routines</p>
+              </div>
+              {profile.isPremium && <Crown size={20} className="text-yellow-500 mb-1 fill-yellow-500"/>}
+            </header>
+
+            {!profile.isPremium ? (
+              <div className="text-center min-h-[50vh] flex flex-col items-center justify-center">
+                <div className="w-24 h-24 bg-white rounded-[32px] shadow-card border border-gray-100 flex items-center justify-center mb-8">
+                  <Dumbbell size={40} className="text-gray-300" />
+                </div>
+                <h2 className="text-2xl font-bold tracking-tighter mb-3">Upgrade to Training</h2>
+                <p className="text-gray-500 mb-10 max-w-xs text-sm font-medium leading-relaxed italic px-4">"Unlock AI-generated workout routines based on your metabolic scanning data."</p>
+                <button onClick={()=>setShowPremium(true)} className="w-full bg-black text-white p-5 rounded-3xl font-bold shadow-2xl flex items-center justify-center gap-3 transition-all active:scale-95 group">
+                  <Crown size={20} className="text-yellow-400 fill-yellow-400 group-hover:rotate-12 transition-transform"/> Start Dr Foodie Pro
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Daily Readiness Meter */}
+                <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-50 relative overflow-hidden">
+                   <div className="flex justify-between items-center mb-4">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Training Readiness</span>
+                      <span className="font-bold text-xs">{readiness}%</span>
+                   </div>
+                   <div className="h-2 w-full bg-gray-50 rounded-full overflow-hidden mb-4">
+                      <div 
+                        className={`h-full transition-all duration-1000 ${readiness > 70 ? 'bg-green-500' : readiness > 40 ? 'bg-yellow-500' : 'bg-red-500'}`} 
+                        style={{ width: `${readiness}%` }}
+                      ></div>
+                   </div>
+                   <p className="text-[10px] text-gray-400 font-medium leading-relaxed italic">
+                     {readiness > 70 ? "Energy levels are optimal for high intensity." : readiness > 40 ? "Moderate energy. Focus on steady-state movement." : "Under-fueled. Priority: Recovery and Light Stretching."}
+                   </p>
+                </div>
+
+                {/* Primary Session Card */}
+                <div className="bg-black text-white p-8 rounded-[40px] shadow-2xl relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-all">
+                  <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 group-hover:scale-150 transition-all duration-700"></div>
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-2 mb-6">
+                       <span className="bg-yellow-400 text-black text-[9px] font-black px-2 py-1 rounded uppercase tracking-wider">Recommended Session</span>
+                    </div>
+                    <h3 className="text-3xl font-bold tracking-tighter mb-2">{getWorkouts()[0].name}</h3>
+                    <p className="text-white/50 text-xs font-medium mb-8 leading-relaxed">Engineered for your {profile.goal} goal. Focuses on high metabolic activation and heart rate elevation.</p>
+                    
+                    <div className="flex items-center justify-between">
+                       <div className="flex gap-4">
+                          <div className="flex items-center gap-1.5 opacity-60">
+                             <Timer size={14}/>
+                             <span className="text-[10px] font-black uppercase tracking-widest">{getWorkouts()[0].dur}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 opacity-60">
+                             <Flame size={14}/>
+                             <span className="text-[10px] font-black uppercase tracking-widest">{getWorkouts()[0].level}</span>
+                          </div>
+                       </div>
+                       <div className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center shadow-lg group-hover:bg-yellow-400 transition-colors">
+                          <Play size={20} fill="currentColor" className="ml-1"/>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Workout Grid - Reframed 2-column Grid */}
+                <div className="px-1 pt-2">
+                   <h4 className="text-lg font-bold tracking-tight mb-4">Adaptive Routines</h4>
+                   <div className="grid grid-cols-2 gap-4">
+                      {getWorkouts().slice(1).map((w, i) => (
+                        <div key={i} className="bg-white p-5 rounded-[32px] shadow-card border border-gray-100 flex flex-col justify-between h-48 transition-all hover:translate-y-[-4px] active:scale-95 cursor-pointer group">
+                           <div className="flex justify-between items-start mb-4">
+                              <div className="p-2.5 bg-gray-50 rounded-2xl text-black group-hover:bg-black group-hover:text-white transition-colors">
+                                 {w.icon}
+                              </div>
+                              <span className="text-[8px] font-black bg-gray-100 text-gray-400 px-2 py-1 rounded uppercase tracking-widest">{w.tag}</span>
+                           </div>
+                           <div>
+                              <div className="font-bold text-sm tracking-tight mb-1">{w.name}</div>
+                              <div className="flex items-center gap-2 text-gray-400">
+                                 <span className="text-[9px] font-black uppercase tracking-widest">{w.dur}</span>
+                                 <div className="w-1 h-1 bg-gray-200 rounded-full"></div>
+                                 <span className="text-[9px] font-black uppercase tracking-widest">{w.level}</span>
+                              </div>
+                           </div>
+                        </div>
+                      ))}
+                   </div>
+                </div>
+
+                {/* Adaptive Disclaimer */}
+                <div className="mt-8 p-6 bg-gray-50 rounded-[32px] border border-dashed border-gray-200 text-center">
+                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Dr Foodie Protocol v2.2</p>
+                   <p className="text-[9px] text-gray-300 font-medium">Workouts refresh based on daily nutrient density and goal adherence.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {view === 'analysis' && analysis && (
           <div className="pt-6 animate-fade-in">
             <button onClick={()=>setView('home')} className="mb-4 p-2 bg-white rounded-full shadow-card hover:bg-gray-50 transition-colors"><ArrowLeft size={20}/></button>
@@ -259,7 +359,6 @@ const App: React.FC = () => {
                   <Star className="text-yellow-400 fill-yellow-400" size={20} />
                 </div>
 
-                {/* Pro Only Clinical Insight */}
                 {profile.isPremium && (
                   <div className="mb-8 p-5 bg-yellow-50 rounded-[32px] border border-yellow-200 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 opacity-5"><Crown size={40} /></div>
@@ -313,7 +412,6 @@ const App: React.FC = () => {
                <Calendar className="text-black mb-1" size={20} />
              </div>
              
-             {/* Hydration Card */}
              <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-100 relative overflow-hidden group">
                 <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-blue-50 rounded-full blur-3xl opacity-50 transition-all group-hover:scale-150"></div>
                 <div className="flex justify-between items-center mb-5 relative z-10">
@@ -339,7 +437,7 @@ const App: React.FC = () => {
              <div className="grid grid-cols-2 gap-4">
                <div className="bg-white p-6 rounded-[32px] shadow-card text-center border border-gray-50">
                   <span className="font-bold text-[9px] uppercase tracking-widest text-gray-400 block mb-4">Metabolic Hit</span>
-                  <div className="text-4xl font-black tracking-tighter">{Math.round((todayCalories/targetCals)*100)}%</div>
+                  <div className="text-4xl font-black tracking-tighter">{readiness}%</div>
                   <p className="text-[9px] font-bold text-gray-400 mt-2 uppercase tracking-tight">Daily Target Met</p>
                </div>
                <div className="bg-black p-6 rounded-[32px] shadow-card text-center text-white relative overflow-hidden">
@@ -350,7 +448,6 @@ const App: React.FC = () => {
                </div>
              </div>
 
-             {/* Pro Only Metabolic Forecast */}
              {profile.isPremium && (
                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-7 rounded-[32px] border border-yellow-100 shadow-sm relative overflow-hidden">
                  <div className="absolute -top-4 -right-4 w-20 h-20 bg-yellow-400/10 rounded-full blur-2xl"></div>
@@ -371,7 +468,6 @@ const App: React.FC = () => {
                </div>
              )}
 
-             {/* Distribution Chart */}
              <div className="bg-white p-7 rounded-[32px] shadow-card border border-gray-50">
                 <div className="flex items-center gap-2 mb-8 px-1">
                   <Clock className="text-black" size={18}/>
@@ -389,7 +485,6 @@ const App: React.FC = () => {
                 </div>
              </div>
 
-             {/* Quality Trend Chart */}
              <div className="bg-white p-7 rounded-[32px] shadow-card border border-gray-50">
                 <div className="flex items-center gap-2 mb-8 px-1">
                   <Activity className="text-green-500" size={18}/>
@@ -410,59 +505,8 @@ const App: React.FC = () => {
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="mt-4 flex justify-between items-center text-[9px] font-black text-gray-400 uppercase tracking-widest px-1">
-                  <span>Score Accuracy</span>
-                  <span className="text-green-600">Stable Progress</span>
-                </div>
              </div>
            </div>
-        )}
-
-        {view === 'workouts' && (
-          <div className="pt-6 animate-fade-in pb-10">
-            <h1 className="text-3xl font-bold tracking-tighter mb-2 px-1">Movement</h1>
-            <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mb-8 px-1">Bio-Adaptive Routines</p>
-            
-            {!profile.isPremium ? (
-              <div className="text-center min-h-[50vh] flex flex-col items-center justify-center">
-                <div className="w-24 h-24 bg-white rounded-[32px] shadow-card border border-gray-100 flex items-center justify-center mb-8">
-                  <Dumbbell size={40} className="text-gray-300" />
-                </div>
-                <h2 className="text-2xl font-bold tracking-tighter mb-3">Upgrade to Unlocked</h2>
-                <p className="text-gray-500 mb-10 max-w-xs text-sm font-medium leading-relaxed italic">"Unlock AI-generated workout routines based on your metabolic scanning data."</p>
-                <button onClick={()=>setShowPremium(true)} className="w-full bg-black text-white p-5 rounded-3xl font-bold shadow-2xl flex items-center justify-center gap-3 transition-all active:scale-95 group">
-                  <Crown size={20} className="text-yellow-400 fill-yellow-400 group-hover:rotate-12 transition-transform"/> Start Dr Foodie Pro
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-50 mb-6">
-                  <div className="flex items-center gap-3 mb-1">
-                    <Trophy className="text-yellow-500" size={20} fill="currentColor" />
-                    <h4 className="font-bold text-sm tracking-tight">Today's Precision Plan</h4>
-                  </div>
-                  <p className="text-xs text-gray-400 font-medium">Based on your {profile.goal} goal and recent nutritional intake.</p>
-                </div>
-                
-                {getWorkouts().map((w, i) => (
-                  <div key={i} className="bg-white p-5 rounded-[32px] shadow-card flex items-center gap-5 border border-gray-50 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer">
-                    <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center">
-                      {w.icon}
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-bold text-sm mb-0.5">{w.name}</div>
-                      <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{w.dur} • {w.level} Intensity</div>
-                    </div>
-                    <ChevronRight className="text-gray-200" size={18} />
-                  </div>
-                ))}
-                
-                <div className="mt-10 p-10 bg-gray-100/50 rounded-[40px] border-2 border-dashed border-gray-200 text-center">
-                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Adaptive Logic Refreshing...</p>
-                </div>
-              </div>
-            )}
-          </div>
         )}
 
         {view === 'settings' && (
@@ -490,7 +534,7 @@ const App: React.FC = () => {
               </button>
             </div>
             <div className="text-center">
-               <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Dr Foodie v1.5.0 • Clinical Protocol Loaded</p>
+               <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Dr Foodie v1.5.2 • Elite Protocol</p>
             </div>
           </div>
         )}
