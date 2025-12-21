@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Goal, UserProfile, Gender } from '../types';
 import { ChevronRight, User, Scale, Clock, Target } from 'lucide-react';
@@ -10,11 +11,11 @@ interface OnboardingProps {
 const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
   const [step, setStep] = useState(1);
   
-  // State
+  // State - using strings for numeric inputs to allow clearing and prevent leading zeros
   const [name, setName] = useState(initialData?.name || '');
-  const [age, setAge] = useState<number>(initialData?.age || 25);
+  const [age, setAge] = useState<string>(initialData?.age?.toString() || '25');
   const [gender, setGender] = useState<Gender>(initialData?.gender || Gender.MALE);
-  const [height, setHeight] = useState<number>(initialData?.height || 175);
+  const [height, setHeight] = useState<string>(initialData?.height?.toString() || '175');
   
   const [weight, setWeight] = useState<number>(initialData?.weight || 70);
   const [targetWeight, setTargetWeight] = useState<number>(initialData?.targetWeight || 65);
@@ -39,9 +40,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
     } else {
       onComplete({
         name,
-        age,
+        age: parseInt(age) || 0,
         gender,
-        height,
+        height: parseInt(height) || 0,
         weight,
         targetWeight,
         goal,
@@ -54,13 +55,22 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
 
   const adjustTargetWeight = (increment: number) => {
     const newWeight = targetWeight + increment;
-    
-    // Strict Validation Logic
-    if (goal === Goal.LOSE_WEIGHT && newWeight >= weight) return; // Must be lower
-    if (goal === Goal.GAIN_WEIGHT && newWeight <= weight) return; // Must be higher
-    if (goal === Goal.MAINTAIN) return; // Locked to current weight
-
+    if (goal === Goal.LOSE_WEIGHT && newWeight >= weight) return;
+    if (goal === Goal.GAIN_WEIGHT && newWeight <= weight) return;
+    if (goal === Goal.MAINTAIN) return;
     setTargetWeight(newWeight);
+  };
+
+  // Improved numeric input handler to solve "stuck 0" and leading zero issues
+  const handleNumericInput = (val: string, setter: (s: string) => void) => {
+    if (val === '') {
+      setter('');
+      return;
+    }
+    // Remove leading zeros
+    const cleaned = val.replace(/^0+/, '');
+    // If it was just '0', keep it, otherwise use cleaned
+    setter(cleaned === '' && val !== '' ? '0' : cleaned);
   };
 
   return (
@@ -71,7 +81,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
           <p className="text-gray-500">Your Personal Nutrition AI</p>
         </div>
 
-        {/* Progress Bar */}
         <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
           <div 
             className="bg-black h-full transition-all duration-300 ease-in-out" 
@@ -80,14 +89,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
         </div>
 
         <div className="bg-white rounded-[32px] p-8 shadow-card border border-gray-100 min-h-[450px] flex flex-col justify-between">
-          
-          {/* STEP 1: Personal Details (Swapped to be first) */}
           {step === 1 && (
             <div className="space-y-6 animate-fade-in">
               <h2 className="text-2xl font-heading font-bold flex items-center gap-2">
                 <User className="text-black" size={24} /> About You
               </h2>
-              
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">First Name</label>
                 <input
@@ -98,14 +104,14 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
                   placeholder="e.g. Alex"
                 />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Age</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={age}
-                    onChange={(e) => setAge(Number(e.target.value))}
+                    onChange={(e) => handleNumericInput(e.target.value, setAge)}
                     className="w-full p-4 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-black focus:outline-none font-medium"
                   />
                 </div>
@@ -122,13 +128,13 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
                   </select>
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Height (cm)</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={height}
-                  onChange={(e) => setHeight(Number(e.target.value))}
+                  onChange={(e) => handleNumericInput(e.target.value, setHeight)}
                   className="w-full p-4 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-black focus:outline-none font-medium"
                   placeholder="175"
                 />
@@ -136,14 +142,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
             </div>
           )}
 
-          {/* STEP 2: The Plan (Goal) (Swapped to be second) */}
           {step === 2 && (
             <div className="space-y-6 animate-fade-in">
               <h2 className="text-2xl font-heading font-bold flex items-center gap-2">
                 <Target className="text-black" size={24} /> The Plan
               </h2>
               <p className="text-gray-500 text-sm">What is your primary objective?</p>
-
               <div className="grid grid-cols-1 gap-3">
                 {Object.values(Goal).map((g) => (
                   <button
@@ -163,13 +167,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
             </div>
           )}
 
-          {/* STEP 3: Weight Goals & Timeline */}
           {step === 3 && (
             <div className="space-y-6 animate-fade-in">
               <h2 className="text-2xl font-heading font-bold flex items-center gap-2">
                 <Scale className="text-black" size={24} /> Goals & Timeline
               </h2>
-              
               <div className="space-y-4">
                 <div className="bg-gray-50 p-4 rounded-2xl">
                   <label className="block text-sm font-bold text-gray-700 mb-2 text-center">Current Weight (kg)</label>
@@ -179,7 +181,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
                     <button onClick={() => setWeight(weight + 1)} className="w-8 h-8 rounded-full bg-white shadow-sm font-bold text-lg hover:bg-gray-100 transition-colors">+</button>
                   </div>
                 </div>
-
                 <div className={`p-4 rounded-2xl transition-all ${goal === Goal.MAINTAIN ? 'bg-gray-100 opacity-70 cursor-not-allowed' : 'bg-black text-white'}`}>
                     <label className={`block text-sm font-bold mb-2 text-center ${goal === Goal.MAINTAIN ? 'text-gray-500' : 'text-gray-300'}`}>Target Weight (kg)</label>
                     <div className="flex items-center justify-center gap-4">
@@ -187,27 +188,14 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
                          <span className="text-3xl font-heading font-bold w-20 text-center text-gray-500">{targetWeight}</span>
                       ) : (
                         <>
-                          <button 
-                            onClick={() => adjustTargetWeight(-1)} 
-                            disabled={goal === Goal.GAIN_WEIGHT && targetWeight <= weight + 1}
-                            className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-lg disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            -
-                          </button>
+                          <button onClick={() => adjustTargetWeight(-1)} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-lg disabled:opacity-30">-</button>
                           <span className="text-3xl font-heading font-bold w-20 text-center">{targetWeight}</span>
-                          <button 
-                            onClick={() => adjustTargetWeight(1)}
-                            disabled={goal === Goal.LOSE_WEIGHT && targetWeight >= weight - 1}
-                            className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-lg disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            +
-                          </button>
+                          <button onClick={() => adjustTargetWeight(1)} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-lg disabled:opacity-30">+</button>
                         </>
                       )}
                     </div>
                 </div>
               </div>
-
               <div className="pt-2">
                 <div className="flex justify-between items-center mb-2">
                   <label className="block text-sm font-bold text-gray-700">Timeline</label>
@@ -215,9 +203,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
                 </div>
                 <input 
                   type="range" 
-                  min="4" 
-                  max="52" 
-                  step="1"
+                  min="4" max="52" step="1"
                   value={durationWeeks}
                   onChange={(e) => setDurationWeeks(Number(e.target.value))}
                   className="w-full accent-black h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
@@ -228,8 +214,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
 
           <button
             onClick={handleNext}
-            disabled={step === 1 && !name}
-            className="w-full mt-auto bg-black text-white py-4 px-6 rounded-2xl font-bold text-lg hover:scale-[1.02] transition-transform flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl"
+            disabled={step === 1 && (!name || age === '')}
+            className="w-full mt-auto bg-black text-white py-4 px-6 rounded-2xl font-bold text-lg hover:scale-[1.02] transition-transform flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl"
           >
             {step === 3 ? (initialData ? "Save Changes" : "Start My Journey") : "Next Step"} <ChevronRight size={20} />
           </button>

@@ -11,12 +11,14 @@ export enum Goal {
   GAIN_WEIGHT = 'Gain Weight',
 }
 
-export enum WorkoutGoal {
-  BELLY_FAT = 'Lower Belly Fat',
-  OVERALL_FAT_LOSS = 'Overall Fat Loss',
-  LEG_TONING = 'Leg Toning',
-  MUSCLE_GAIN = 'Muscle Gain',
-  HIIT = 'High Intensity (HIIT)'
+export enum MuscleGroup {
+  CHEST = 'Chest',
+  BACK = 'Back',
+  SHOULDERS = 'Shoulders',
+  ARMS = 'Arms',
+  LEGS = 'Legs',
+  GLUTES = 'Glutes',
+  ABS_CORE = 'Abs/Core',
 }
 
 export enum WorkoutLocation {
@@ -39,7 +41,6 @@ export interface UserProfile {
   targetWeight: number;
   durationWeeks: number;
   goal: Goal;
-  workoutGoal?: WorkoutGoal; 
   workoutLocation?: WorkoutLocation; 
   isOnboarded: boolean;
   progressPhotos?: ProgressPhoto[];
@@ -73,5 +74,6 @@ export interface Exercise {
   reps: string;
   description: string;
   imageUrl: string;
-  instructions?: string[];
+  location: WorkoutLocation;
+  muscleGroups: MuscleGroup[];
 }

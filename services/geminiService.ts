@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { UserProfile } from "../types";
 
 const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY = 1000;
+const INITIAL_RETRY_DELAY = 1500;
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -14,31 +14,36 @@ export const analyzeFoodImage = async (
   userProfile: UserProfile,
   mimeType: string = "image/jpeg"
 ): Promise<any> => {
-  // Always initialize GoogleGenAI with a named parameter
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const systemPrompt = `
-    You are Dr Foodie, an elite nutrition AI. 
-    Analyze the food image and return precise nutritional data.
-    
-    User Goal: ${userProfile.goal} (${userProfile.weight}kg -> ${userProfile.targetWeight}kg)
-    
-    Categorize 'mealType' as one of: 'Breakfast', 'Lunch', 'Dinner', 'Snack'.
-    In 'microAnalysis', provide 2 clinical sentences on how this meal affects their specific metabolic journey.
-    
-    Return a Health Score from 1-10.
+    You are Dr Foodie, an elite medical-grade nutrition AI. 
+    Analyze the provided food image with extreme precision for a user with the following profile:
+    Goal: ${userProfile.goal}
+    Current Weight: ${userProfile.weight}kg
+    Target Weight: ${userProfile.targetWeight}kg
+    Age/Gender: ${userProfile.age}y / ${userProfile.gender}
+
+    Requirements:
+    1. Identify the food item and estimate portion size.
+    2. Provide accurate Macros (Calories, Protein, Carbs, Fat).
+    3. Categorize 'mealType': 'Breakfast', 'Lunch', 'Dinner', 'Snack'.
+    4. Provide 'microAnalysis': 2-3 clinical sentences on how this specific meal affects the user's metabolic rate, glucose stability, and goal progress.
+    5. Health Score: 1-10 based on nutritional density.
+
+    Output MUST be strictly JSON.
   `;
 
   let lastError: any;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      // Use gemini-3-pro-preview for complex reasoning and clinical metabolic analysis
+      // Using gemini-3-flash-preview for high speed, reliability, and better rate limits for multimodal tasks
       const response = await ai.models.generateContent({
-        model: "gemini-3-pro-preview",
+        model: "gemini-3-flash-preview",
         contents: {
           parts: [
             { inlineData: { mimeType, data: base64Image } },
-            { text: "Analyze this meal for Dr Foodie. Provide macros, meal type, and clinical advice." },
+            { text: "Dr Foodie, analyze this meal and provide the metabolic breakdown in JSON format." },
           ],
         },
         config: {
@@ -61,19 +66,20 @@ export const analyzeFoodImage = async (
         },
       });
 
-      // Directly access .text property from response
       const text = response.text?.trim();
       if (!text) throw new Error("Empty AI response");
       return JSON.parse(text);
     } catch (error: any) {
       lastError = error;
-      // Implement robust handling for API errors and unexpected responses
-      if ((error?.status === 429 || error?.status === 503) && attempt < MAX_RETRIES - 1) {
+      console.warn(`Analysis attempt ${attempt + 1} failed:`, error.message);
+      
+      // Handle rate limits (429) or overloaded service (503) with backoff
+      if ((error?.status === 429 || error?.status === 503 || error?.status === 500) && attempt < MAX_RETRIES - 1) {
         await sleep(INITIAL_RETRY_DELAY * Math.pow(2, attempt));
         continue;
       }
       break;
     }
   }
-  throw lastError;
+  throw new Error(lastError?.message || "Dr Foodie is currently over-capacity. Please try again in a moment.");
 };
