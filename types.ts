@@ -46,6 +46,8 @@ export interface UserProfile {
   progressPhotos?: ProgressPhoto[];
   isPremium?: boolean;
   dailyWaterGoal?: number;
+  scansUsedToday?: number;
+  lastScanResetDate?: string;
 }
 
 export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
