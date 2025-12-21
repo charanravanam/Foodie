@@ -651,9 +651,9 @@ const App: React.FC = () => {
             <div className="space-y-6">
               <div className="bg-black text-white p-8 rounded-[40px] shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-10"><Crown size={80}/></div>
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50 mb-4">Founder & Visionary</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50 mb-4">Founder</div>
                 <h2 className="text-3xl font-black tracking-tight">Charan Ravanam</h2>
-                <p className="text-gray-400 mt-2 text-sm leading-relaxed">Pioneering the next generation of AI-driven clinical nutrition and personalized wellness.</p>
+                <p className="text-gray-400 mt-2 text-sm leading-relaxed"></p>
               </div>
 
               <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100">
@@ -662,8 +662,7 @@ const App: React.FC = () => {
                   {[
                     "Kranthi Madireddy",
                     "Amogha",
-                    "Jathin Kongalla",
-                    "Sri Tej",
+                    "Jathin",
                     "Srikanth"
                   ].map((member, i) => (
                     <div key={i} className="flex items-center gap-4 p-5 bg-gray-50 rounded-[28px] border border-gray-100 hover:bg-white hover:shadow-md transition-all group">
