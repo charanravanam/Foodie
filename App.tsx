@@ -5,7 +5,7 @@ import {
   Camera, User, Dumbbell, LogOut, Crown, Loader2, TrendingUp,
   Apple, Target, Zap, Star, Activity, Droplets, Calendar, Clock,
   Trophy, CheckCircle2, Info, Timer, ZapOff, Play, X, Pause, SkipForward,
-  Scan, Sparkles, MapPin, Check, Image as ImageIcon, RefreshCcw, Maximize, ScanLine, Trash2, Wallet, Gift, Award
+  Scan, Sparkles, MapPin, Check, Image as ImageIcon, RefreshCcw, Maximize, ScanLine, Trash2, Wallet, Gift, Award, Users
 } from 'lucide-react';
 import { 
   BarChart, Bar, ResponsiveContainer
@@ -88,7 +88,7 @@ const EXERCISE_DB: Exercise[] = [
 const App: React.FC = () => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [view, setView] = useState<'home' | 'workouts' | 'stats' | 'settings' | 'analysis' | 'camera'>('home');
+  const [view, setView] = useState<'home' | 'workouts' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team'>('home');
   const [scans, setScans] = useState<ScanHistoryItem[]>([]);
   const [showPremium, setShowPremium] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -635,13 +635,50 @@ const App: React.FC = () => {
               </div>
               <button onClick={()=>setProfile(null)} className="w-full p-6 text-left font-bold text-sm hover:bg-gray-50 rounded-[28px] transition-colors flex justify-between items-center"><span className="flex items-center gap-4"><User size={20}/> Profile Update</span><ChevronRight size={18} className="text-gray-200"/></button>
               <button onClick={()=>setShowPremium(true)} className="w-full p-6 text-left font-bold text-sm hover:bg-gray-50 rounded-[28px] transition-colors flex justify-between items-center"><span className="flex items-center gap-4"><Crown size={20} className="text-yellow-500"/> Dr Foodie Pro</span><ChevronRight size={18} className="text-gray-200"/></button>
+              <button onClick={()=>setView('team')} className="w-full p-6 text-left font-bold text-sm hover:bg-gray-50 rounded-[28px] transition-colors flex justify-between items-center"><span className="flex items-center gap-4"><Users size={20}/> The Team</span><ChevronRight size={18} className="text-gray-200"/></button>
               <button onClick={()=>signOut(auth)} className="w-full p-6 text-left font-bold text-sm text-red-500 hover:bg-red-50 rounded-[28px] transition-colors flex items-center gap-4"><LogOut size={20}/> Sign Out</button>
+            </div>
+          </div>
+        )}
+
+        {view === 'team' && (
+          <div className="pt-6 animate-fade-in space-y-8">
+            <header className="flex items-center gap-4 px-1">
+              <button onClick={() => setView('settings')} className="p-3 bg-white rounded-2xl shadow-sm hover:bg-gray-50 transition-colors"><ArrowLeft size={20}/></button>
+              <h1 className="text-3xl font-bold tracking-tighter">The Team</h1>
+            </header>
+
+            <div className="space-y-6">
+              <div className="bg-black text-white p-8 rounded-[40px] shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10"><Crown size={80}/></div>
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50 mb-4">Founder & Visionary</div>
+                <h2 className="text-3xl font-black tracking-tight">Charan Ravanam</h2>
+                <p className="text-gray-400 mt-2 text-sm leading-relaxed">Pioneering the next generation of AI-driven clinical nutrition and personalized wellness.</p>
+              </div>
+
+              <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100">
+                <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 mb-8 flex items-center gap-2"><Users size={16} className="text-black"/> Core Team Members</h3>
+                <div className="grid grid-cols-1 gap-4">
+                  {[
+                    "Kranthi Madireddy",
+                    "Amogha",
+                    "Jathin Kongalla",
+                    "Sri Tej",
+                    "Srikanth"
+                  ].map((member, i) => (
+                    <div key={i} className="flex items-center gap-4 p-5 bg-gray-50 rounded-[28px] border border-gray-100 hover:bg-white hover:shadow-md transition-all group">
+                      <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm font-black group-hover:bg-black group-hover:text-white transition-colors">{member.charAt(0)}</div>
+                      <span className="font-bold text-lg tracking-tight">{member}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {view !== 'analysis' && view !== 'camera' && !activeWorkout && (
+      {view !== 'analysis' && view !== 'camera' && view !== 'team' && !activeWorkout && (
         <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-gray-100 p-4 pb-10 flex justify-between items-center z-40 max-w-md mx-auto px-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
           <button onClick={()=>{setView('home'); setSelectedDate(new Date().toDateString())}} className={`transition-all duration-300 ${view==='home'?'text-black scale-125':'text-black/30'}`}><Home size={22}/></button>
           <button onClick={()=>{ setView('workouts'); setWorkoutStep(1); }} className={`transition-all duration-300 ${view==='workouts'?'text-black scale-125':'text-black/30'}`}><Dumbbell size={22}/></button>
