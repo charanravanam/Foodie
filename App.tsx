@@ -661,7 +661,7 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-1 gap-4">
                   {[
                     "Kranthi Madireddy",
-                    "Amogha",
+                    "Amogha Gangula",
                     "Jathin Kongalla"
                   ].map((member, i) => (
                     <div key={i} className="flex items-center gap-4 p-5 bg-gray-50 rounded-[28px] border border-gray-100 hover:bg-white hover:shadow-md transition-all group">
