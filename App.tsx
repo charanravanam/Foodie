@@ -662,8 +662,7 @@ const App: React.FC = () => {
                   {[
                     "Kranthi Madireddy",
                     "Amogha",
-                    "Jathin",
-                    "Srikanth"
+                    "Jathin Kongalla"
                   ].map((member, i) => (
                     <div key={i} className="flex items-center gap-4 p-5 bg-gray-50 rounded-[28px] border border-gray-100 hover:bg-white hover:shadow-md transition-all group">
                       <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm font-black group-hover:bg-black group-hover:text-white transition-colors">{member.charAt(0)}</div>
