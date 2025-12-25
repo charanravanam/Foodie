@@ -37,10 +37,12 @@ const formatCoins = (num: number) => {
 };
 
 const resizeImage = (base64Str: string, maxWidth = 1024, maxHeight = 1024): Promise<string> => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new window.Image();
-    img.src = base64Str;
+    const timeout = setTimeout(() => reject(new Error("Image processing timed out")), 10000);
+    
     img.onload = () => {
+      clearTimeout(timeout);
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
@@ -63,6 +65,14 @@ const resizeImage = (base64Str: string, maxWidth = 1024, maxHeight = 1024): Prom
       ctx?.drawImage(img, 0, 0, width, height);
       resolve(canvas.toDataURL('image/jpeg', 0.8));
     };
+    
+    img.onerror = () => {
+      clearTimeout(timeout);
+      reject(new Error("Failed to load image for processing"));
+    };
+
+    // Set src AFTER defining onload to prevent race conditions
+    img.src = base64Str;
   });
 };
 
@@ -755,8 +765,18 @@ const App: React.FC = () => {
     setView('analysis');
     setClarificationQuestion(null);
     try {
-      const optimizedBase64 = await resizeImage(base64);
+      // Step 1: Pre-process image (resize and compress)
+      let optimizedBase64: string;
+      try {
+        optimizedBase64 = await resizeImage(base64);
+      } catch (e) {
+        console.warn("Resize failed, using original:", e);
+        optimizedBase64 = base64;
+      }
+
       const base64Data = optimizedBase64.includes(',') ? optimizedBase64.split(',')[1] : optimizedBase64;
+      
+      // Step 2: AI Analysis
       const result = await analyzeFoodImage(base64Data, profile, clarification);
       
       if (result.needsClarification) {
@@ -785,7 +805,8 @@ const App: React.FC = () => {
         points: (prev.points || 0) + COINS_PER_SCAN
       } : null);
     } catch (err) {
-      alert("Analysis failed.");
+      console.error("Scanning Error:", err);
+      alert("Metabolic analysis link failed. Please check network and try again.");
       setView('home');
     } finally { setIsAnalyzing(false); }
   };
@@ -842,8 +863,13 @@ const App: React.FC = () => {
   return (
     <div className="max-w-md mx-auto min-h-screen bg-[#F2F2F7] text-black relative shadow-2xl flex flex-col font-sans overflow-hidden">
       <canvas ref={canvasRef} className="hidden" />
-      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={async (e) => {
-        const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = () => processImage(r.result as string); r.readAsDataURL(f); }
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => {
+        const f = e.target.files?.[0]; 
+        if (f) { 
+          const r = new FileReader(); 
+          r.onload = () => processImage(r.result as string); 
+          r.readAsDataURL(f); 
+        }
       }} />
 
       <div className="flex-1 overflow-hidden h-full">

@@ -99,12 +99,14 @@ export const analyzeFoodImage = async (
         contents: {
           parts: [
             { inlineData: { mimeType, data: base64Image } },
-            { text: "Dr Foodie, analyze this meal fast." },
+            { text: additionalInfo || "Dr Foodie, analyze this meal fast." },
           ],
         },
         config: {
           systemInstruction: systemPrompt,
           responseMimeType: "application/json",
+          // Latency optimization: disable thinking tokens for faster visual identification
+          thinkingConfig: { thinkingBudget: 0 },
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -130,6 +132,7 @@ export const analyzeFoodImage = async (
       return JSON.parse(text);
     } catch (error: any) {
       lastError = error;
+      // Retry on transient server errors or rate limiting
       if ((error?.status === 429 || error?.status === 500) && attempt < MAX_RETRIES - 1) {
         await sleep(INITIAL_RETRY_DELAY);
         continue;
@@ -137,5 +140,5 @@ export const analyzeFoodImage = async (
       break;
     }
   }
-  throw new Error(lastError?.message || "Over capacity.");
+  throw new Error(lastError?.message || "AI Metabolic Node over capacity.");
 };
