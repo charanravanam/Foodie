@@ -1,117 +1,169 @@
-import React, { useState } from 'react';
-import { auth } from '../services/firebase';
-// Fixing modular imports for Auth functions to resolve member resolution issues
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 
-const Auth = () => {
+import React, { useState } from 'react';
+import { auth, db } from '../services/firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { Mail, Lock, ArrowRight, Loader2, Gift, ShieldAlert, Key, HelpCircle } from 'lucide-react';
+
+interface AuthProps {
+  onAdminLogin: (status: boolean) => void;
+}
+
+const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setMessage(null);
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setMessage("Recovery link dispatched! Check your inbox.");
+    } catch (err: any) {
+      setError(err.message || "Failed to send recovery email.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isForgotPassword) return handleResetPassword(e);
+
     setError(null);
     setLoading(true);
+
+    // ADMIN LOGIN CHECK
+    if (email.toLowerCase() === 'admin' && password === 'adminfoodie') {
+      onAdminLogin(true);
+      setLoading(false);
+      return;
+    }
 
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        if (referralCode.trim()) {
+           localStorage.setItem(`pending_referral_${user.uid}`, referralCode.trim().toUpperCase());
+        }
       }
     } catch (err: any) {
       console.error("Auth Error:", err);
-      // Accessing 'code' from error object by casting to any to ensure broad compatibility across environments
-      const firebaseError = err as any;
-      let msg = "An unexpected error occurred. Please try again.";
-      
-      if (firebaseError.code === 'auth/invalid-email') msg = "Invalid email address format.";
-      if (firebaseError.code === 'auth/user-disabled') msg = "This account has been disabled.";
-      if (firebaseError.code === 'auth/user-not-found') msg = "No account found with this email.";
-      if (firebaseError.code === 'auth/wrong-password') msg = "Incorrect password. Please try again.";
-      if (firebaseError.code === 'auth/email-already-in-use') msg = "An account with this email already exists.";
-      if (firebaseError.code === 'auth/weak-password') msg = "Password is too weak. Use at least 6 characters.";
-      if (firebaseError.code === 'auth/network-request-failed') msg = "Network error. Please check your internet connection.";
-      if (firebaseError.code === 'auth/too-many-requests') msg = "Too many failed attempts. Try again later.";
-      
-      setError(`${msg} (${firebaseError.code})`);
+      let msg = "An unexpected error occurred.";
+      if (err.code === 'auth/wrong-password') msg = "Incorrect password.";
+      if (err.code === 'auth/user-not-found') msg = "No account found.";
+      if (err.code === 'auth/email-already-in-use') msg = "Node already exists with this email.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white font-sans">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <img src="https://www.foodieqr.com/assets/img/logo.svg" alt="Dr Foodie" className="h-16 mx-auto mb-4" />
-          <h1 className="text-2xl font-heading font-bold text-black">{isLogin ? 'Welcome Back' : 'Create Account'}</h1>
-          <p className="text-gray-500 text-sm mt-2">
-            {isLogin ? 'Enter your details to access your plan.' : 'Start your personalized nutrition journey.'}
+          <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl transition-transform hover:scale-110">
+            {isForgotPassword ? <Key className="text-white" size={32} /> : <ShieldAlert className="text-white" size={32} />}
+          </div>
+          <h1 className="text-2xl font-black tracking-tight">
+            {isForgotPassword ? 'Reset Access' : (isLogin ? 'Welcome Back' : 'Create Account')}
+          </h1>
+          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
+            {isForgotPassword ? 'Recover your terminal node' : (isLogin ? 'Log in to your terminal' : 'Join the elite nutrition network')}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+              <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
               <input
-                type="email"
+                type="text"
                 placeholder="Email Address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-black focus:outline-none font-medium transition-all"
+                className="w-full pl-14 pr-4 py-5 bg-gray-50 rounded-[24px] border-none focus:ring-2 focus:ring-black focus:outline-none font-bold transition-all shadow-inner"
                 required
               />
             </div>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border-none focus:ring-2 focus:ring-black focus:outline-none font-medium transition-all"
-                required
-              />
-            </div>
+            
+            {!isForgotPassword && (
+              <div className="relative animate-fade-in">
+                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                <input
+                  type="password"
+                  placeholder={isLogin ? "Password" : "Create a password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-14 pr-4 py-5 bg-gray-50 rounded-[24px] border-none focus:ring-2 focus:ring-black focus:outline-none font-bold transition-all shadow-inner"
+                  required
+                />
+              </div>
+            )}
+
+            {!isLogin && !isForgotPassword && (
+              <div className="relative animate-fade-in">
+                <Gift className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                <input
+                  type="text"
+                  placeholder="Referral Code (Optional)"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value)}
+                  className="w-full pl-14 pr-4 py-5 bg-gray-50 rounded-[24px] border-none focus:ring-2 focus:ring-black focus:outline-none font-bold transition-all shadow-inner uppercase"
+                />
+              </div>
+            )}
           </div>
 
-          {error && (
-            <div className="p-3 bg-red-50 text-red-500 text-xs font-medium rounded-xl text-center leading-relaxed">
-              {error}
-            </div>
-          )}
+          {error && <div className="p-4 bg-red-50 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-2xl text-center border border-red-100 animate-fade-in">{error}</div>}
+          {message && <div className="p-4 bg-green-50 text-green-500 text-[10px] font-black uppercase tracking-widest rounded-2xl text-center border border-green-100 animate-fade-in">{message}</div>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-black text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:scale-[1.02] transition-transform flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+            className="w-full bg-black text-white py-5 rounded-[24px] font-black text-lg shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
           >
-            {loading ? (
-              <Loader2 className="animate-spin" size={20} />
-            ) : (
-              <>
-                {isLogin ? 'Sign In' : 'Sign Up'} <ArrowRight size={20} />
-              </>
-            )}
+            {loading ? <Loader2 className="animate-spin" size={20} /> : (isForgotPassword ? 'SEND RECOVERY' : (isLogin ? 'LOG IN' : 'ESTABLISH NODE'))}
           </button>
         </form>
 
-        <div className="mt-8 text-center">
-          <p className="text-gray-500 text-sm">
-            {isLogin ? "Don't have an account?" : "Already have an account?"}
+        <div className="mt-8 space-y-4 text-center">
+          {isLogin && !isForgotPassword && (
             <button
               type="button"
-              onClick={() => { setIsLogin(!isLogin); setError(null); }}
-              className="ml-2 font-bold text-black hover:underline"
+              onClick={() => setIsForgotPassword(true)}
+              className="text-[10px] font-black text-gray-300 uppercase tracking-widest hover:text-black transition-colors flex items-center justify-center gap-2 mx-auto"
             >
-              {isLogin ? 'Sign Up' : 'Log In'}
+              <HelpCircle size={12}/> Forgot Password?
             </button>
-          </p>
+          )}
+          
+          <button
+            type="button"
+            onClick={() => {
+              if (isForgotPassword) {
+                setIsForgotPassword(false);
+              } else {
+                setIsLogin(!isLogin);
+              }
+              setError(null);
+              setMessage(null);
+            }}
+            className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors"
+          >
+            {isForgotPassword ? "Back to Login" : (isLogin ? "Need an account? Sign Up" : "Already have an account? Log In")}
+          </button>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Goal, UserProfile, Gender } from '../types';
-import { ChevronRight, User, Scale, Clock, Target } from 'lucide-react';
+import { ChevronRight, User, Scale, Clock, Target, Check, Edit2, Zap, Ruler } from 'lucide-react';
 
 interface OnboardingProps {
   onComplete: (profile: UserProfile) => void;
@@ -10,20 +10,58 @@ interface OnboardingProps {
 
 const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
   const [step, setStep] = useState(1);
+  const [countdown, setCountdown] = useState(5);
   
-  // State - using strings for numeric inputs to allow clearing and prevent leading zeros
+  // Basic Info
   const [name, setName] = useState(initialData?.name || '');
   const [age, setAge] = useState<string>(initialData?.age?.toString() || '25');
   const [gender, setGender] = useState<Gender>(initialData?.gender || Gender.MALE);
-  const [height, setHeight] = useState<string>(initialData?.height?.toString() || '175');
   
+  // Height Logic
+  const [heightUnit, setHeightUnit] = useState<'cm' | 'ft'>('cm');
+  const [heightCM, setHeightCM] = useState<string>(initialData?.height?.toString() || '175');
+  const [heightFt, setHeightFt] = useState<string>('5');
+  const [heightIn, setHeightIn] = useState<string>('9');
+  
+  // Weight Logic
   const [weight, setWeight] = useState<number>(initialData?.weight || 70);
   const [targetWeight, setTargetWeight] = useState<number>(initialData?.targetWeight || 65);
   
+  // Goals
   const [goal, setGoal] = useState<Goal>(initialData?.goal || Goal.LOSE_WEIGHT);
   const [durationWeeks, setDurationWeeks] = useState<number>(initialData?.durationWeeks || 12);
 
-  // Sync validation when Current Weight or Goal changes
+  // Sync Feet/Inches to CM when Feet/Inches change
+  const syncFtInToCM = (ft: string, inc: string) => {
+    const f = parseFloat(ft) || 0;
+    const i = parseFloat(inc) || 0;
+    const totalInches = (f * 12) + i;
+    const cm = Math.round(totalInches * 2.54);
+    setHeightCM(cm.toString());
+  };
+
+  // Sync CM to Feet/Inches when CM changes
+  const syncCMToFtIn = (cmValue: string) => {
+    const cm = parseFloat(cmValue) || 0;
+    const realInches = cm / 2.54;
+    const ft = Math.floor(realInches / 12);
+    const inc = Math.round(realInches % 12);
+    setHeightFt(ft.toString());
+    setHeightIn(inc.toString());
+  };
+
+  // Handle Summary Countdown
+  useEffect(() => {
+    let timer: number;
+    if (step === 4 && countdown > 0) {
+      timer = window.setInterval(() => {
+        setCountdown(prev => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [step, countdown]);
+
+  // Sync weight validation
   useEffect(() => {
     if (goal === Goal.LOSE_WEIGHT) {
       if (targetWeight >= weight) setTargetWeight(weight - 1);
@@ -35,132 +73,191 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
   }, [weight, goal]);
 
   const handleNext = () => {
-    if (step < 3) {
+    if (step < 4) {
+      if (step === 3) setCountdown(5); // Reset timer when entering summary
       setStep(step + 1);
     } else {
       onComplete({
         name,
         age: parseInt(age) || 0,
         gender,
-        height: parseInt(height) || 0,
+        height: parseInt(heightCM) || 0,
         weight,
         targetWeight,
         goal,
         durationWeeks,
         isOnboarded: true,
-        progressPhotos: initialData?.progressPhotos || []
+        progressPhotos: initialData?.progressPhotos || [],
+        referralCode: ''
       });
     }
   };
 
-  const adjustTargetWeight = (increment: number) => {
-    const newWeight = targetWeight + increment;
-    if (goal === Goal.LOSE_WEIGHT && newWeight >= weight) return;
-    if (goal === Goal.GAIN_WEIGHT && newWeight <= weight) return;
-    if (goal === Goal.MAINTAIN) return;
-    setTargetWeight(newWeight);
+  const handleNumericInput = (val: string, setter: (s: string) => void, syncFn?: (v: string) => void) => {
+    const cleaned = val.replace(/[^0-9.]/g, '').replace(/^0+/, '');
+    const final = cleaned === '' && val !== '' ? '0' : cleaned;
+    setter(final);
+    if (syncFn) syncFn(final);
   };
 
-  // Improved numeric input handler to solve "stuck 0" and leading zero issues
-  const handleNumericInput = (val: string, setter: (s: string) => void) => {
-    if (val === '') {
-      setter('');
-      return;
+  const getSummaryMessage = () => {
+    const base = `You want to <span class="text-black font-black underline decoration-black/10 underline-offset-4">${goal.toLowerCase()}</span> with help of Dr Foodie. As you mentioned, your current weight is <span class="text-black font-black">${weight}kgs</span>`;
+    
+    if (goal === Goal.LOSE_WEIGHT) {
+      return `${base} and you plan to <span class="text-black font-black">come down to ${targetWeight}kgs</span> within <span class="text-black font-black">${durationWeeks} weeks</span>.`;
+    } else if (goal === Goal.GAIN_WEIGHT) {
+      return `${base} and you plan to <span class="text-black font-black">reach ${targetWeight}kgs</span> within <span class="text-black font-black">${durationWeeks} weeks</span>.`;
+    } else {
+      return `${base} and you plan to <span class="text-black font-black">stay at this weight</span> for the next <span class="text-black font-black">${durationWeeks} weeks</span>.`;
     }
-    // Remove leading zeros
-    const cleaned = val.replace(/^0+/, '');
-    // If it was just '0', keep it, otherwise use cleaned
-    setter(cleaned === '' && val !== '' ? '0' : cleaned);
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-slate-800 font-sans">
-      <div className="w-full max-w-md space-y-8">
+    <div className="min-h-screen bg-[#F2F2F7] flex flex-col items-center justify-center p-6 text-slate-800 font-sans">
+      <div className="w-full max-w-md space-y-6 animate-fade-in">
         <div className="text-center">
-          <img src="https://www.foodieqr.com/assets/img/logo.svg" alt="Dr Foodie" className="h-16 mx-auto mb-4" />
-          <p className="text-gray-500">Your Personal Nutrition AI</p>
+          <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl">
+            <Zap className="text-white fill-white" size={32} />
+          </div>
+          <h1 className="text-2xl font-black tracking-tight">Dr Foodie</h1>
+          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">AI Nutritionist</p>
         </div>
 
-        <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-          <div 
-            className="bg-black h-full transition-all duration-300 ease-in-out" 
-            style={{ width: `${(step / 3) * 100}%` }}
-          />
-        </div>
+        {step < 4 && (
+          <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+            <div 
+              className="bg-black h-full transition-all duration-500 ease-out" 
+              style={{ width: `${(step / 4) * 100}%` }}
+            />
+          </div>
+        )}
 
-        <div className="bg-white rounded-[32px] p-8 shadow-card border border-gray-100 min-h-[450px] flex flex-col justify-between">
+        <div className="bg-white rounded-[40px] p-8 shadow-card border border-gray-100 min-h-[550px] flex flex-col relative overflow-hidden">
           {step === 1 && (
-            <div className="space-y-6 animate-fade-in">
-              <h2 className="text-2xl font-heading font-bold flex items-center gap-2">
-                <User className="text-black" size={24} /> About You
+            <div className="space-y-6 animate-fade-in flex-1">
+              <h2 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                <User className="text-black" size={24} /> Profile
               </h2>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">First Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full p-4 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-black focus:outline-none font-medium"
-                  placeholder="e.g. Alex"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+              
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Age</label>
+                  <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest px-1">First Name</label>
                   <input
                     type="text"
-                    inputMode="numeric"
-                    value={age}
-                    onChange={(e) => handleNumericInput(e.target.value, setAge)}
-                    className="w-full p-4 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-black focus:outline-none font-medium"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full p-5 rounded-2xl bg-gray-50 border-none focus:ring-2 focus:ring-black font-bold shadow-inner"
+                    placeholder="e.g. Alex"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Gender</label>
-                  <select 
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value as Gender)}
-                    className="w-full p-4 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-black focus:outline-none font-medium appearance-none"
-                  >
-                    {Object.values(Gender).map(g => (
-                      <option key={g} value={g}>{g}</option>
-                    ))}
-                  </select>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest px-1">Age</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={age}
+                      onChange={(e) => handleNumericInput(e.target.value, setAge)}
+                      className="w-full p-5 rounded-2xl bg-gray-50 border-none focus:ring-2 focus:ring-black font-bold shadow-inner"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 tracking-widest px-1">Gender</label>
+                    <select 
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value as Gender)}
+                      className="w-full p-5 rounded-2xl bg-gray-50 border-none focus:ring-2 focus:ring-black font-bold appearance-none shadow-inner"
+                    >
+                      {Object.values(Gender).map(g => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Height (cm)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={height}
-                  onChange={(e) => handleNumericInput(e.target.value, setHeight)}
-                  className="w-full p-4 rounded-xl bg-gray-50 border-none focus:ring-2 focus:ring-black focus:outline-none font-medium"
-                  placeholder="175"
-                />
+
+                <div className="space-y-3 pt-2">
+                  <div className="flex justify-between items-center px-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Height</label>
+                    <div className="flex bg-gray-100 p-1 rounded-xl">
+                      <button 
+                        onClick={() => setHeightUnit('cm')}
+                        className={`px-3 py-1 text-[9px] font-black uppercase rounded-lg transition-all ${heightUnit === 'cm' ? 'bg-black text-white' : 'text-gray-400'}`}
+                      >
+                        CM
+                      </button>
+                      <button 
+                        onClick={() => setHeightUnit('ft')}
+                        className={`px-3 py-1 text-[9px] font-black uppercase rounded-lg transition-all ${heightUnit === 'ft' ? 'bg-black text-white' : 'text-gray-400'}`}
+                      >
+                        FT/IN
+                      </button>
+                    </div>
+                  </div>
+
+                  {heightUnit === 'cm' ? (
+                    <div className="relative animate-fade-in">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={heightCM}
+                        onChange={(e) => handleNumericInput(e.target.value, setHeightCM, syncCMToFtIn)}
+                        className="w-full p-5 rounded-2xl bg-gray-50 border-none focus:ring-2 focus:ring-black font-bold shadow-inner pr-12"
+                        placeholder="Height in CM"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-300 uppercase">CM</span>
+                    </div>
+                  ) : (
+                    <div className="flex gap-3 animate-fade-in">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={heightFt}
+                          onChange={(e) => handleNumericInput(e.target.value, setHeightFt, (v) => syncFtInToCM(v, heightIn))}
+                          className="w-full p-5 rounded-2xl bg-gray-50 border-none focus:ring-2 focus:ring-black font-bold shadow-inner pr-10"
+                          placeholder="FT"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-300 uppercase">FT</span>
+                      </div>
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={heightIn}
+                          onChange={(e) => handleNumericInput(e.target.value, setHeightIn, (v) => syncFtInToCM(heightFt, v))}
+                          className="w-full p-5 rounded-2xl bg-gray-50 border-none focus:ring-2 focus:ring-black font-bold shadow-inner pr-10"
+                          placeholder="IN"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-300 uppercase">IN</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
           {step === 2 && (
-            <div className="space-y-6 animate-fade-in">
-              <h2 className="text-2xl font-heading font-bold flex items-center gap-2">
-                <Target className="text-black" size={24} /> The Plan
+            <div className="space-y-6 animate-fade-in flex-1">
+              <h2 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                <Target className="text-black" size={24} /> Objective
               </h2>
-              <p className="text-gray-500 text-sm">What is your primary objective?</p>
               <div className="grid grid-cols-1 gap-3">
                 {Object.values(Goal).map((g) => (
                   <button
                     key={g}
                     onClick={() => setGoal(g)}
-                    className={`p-5 rounded-xl text-left font-semibold transition-all flex justify-between items-center ${
+                    className={`p-6 rounded-3xl text-left font-bold transition-all flex justify-between items-center group ${
                       goal === g 
-                        ? 'bg-black text-white shadow-lg' 
-                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                        ? 'bg-black text-white shadow-xl scale-[1.02]' 
+                        : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border border-transparent'
                     }`}
                   >
-                    <span>{g}</span>
-                    {goal === g && <ChevronRight size={16} />}
+                    <span className="text-lg tracking-tight">{g}</span>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${goal === g ? 'bg-white/20' : 'bg-gray-200 group-hover:bg-gray-300'}`}>
+                      {goal === g ? <Check size={16} /> : <ChevronRight size={16} />}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -168,57 +265,126 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, initialData }) => {
           )}
 
           {step === 3 && (
-            <div className="space-y-6 animate-fade-in">
-              <h2 className="text-2xl font-heading font-bold flex items-center gap-2">
-                <Scale className="text-black" size={24} /> Goals & Timeline
+            <div className="space-y-6 animate-fade-in flex-1">
+              <h2 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                <Scale className="text-black" size={24} /> Targets
               </h2>
-              <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-2xl">
-                  <label className="block text-sm font-bold text-gray-700 mb-2 text-center">Current Weight (kg)</label>
-                  <div className="flex items-center justify-center gap-4">
-                    <button onClick={() => setWeight(Math.max(30, weight - 1))} className="w-8 h-8 rounded-full bg-white shadow-sm font-bold text-lg hover:bg-gray-100 transition-colors">-</button>
-                    <span className="text-3xl font-heading font-bold w-20 text-center">{weight}</span>
-                    <button onClick={() => setWeight(weight + 1)} className="w-8 h-8 rounded-full bg-white shadow-sm font-bold text-lg hover:bg-gray-100 transition-colors">+</button>
+              <div className="space-y-5">
+                <div className="bg-gray-50 p-6 rounded-[32px] border border-gray-100">
+                  <label className="block text-[10px] font-black uppercase text-gray-400 mb-4 text-center tracking-widest">Current Weight</label>
+                  <div className="flex items-center justify-center gap-8">
+                    <button onClick={() => setWeight(Math.max(30, weight - 1))} className="w-12 h-12 rounded-2xl bg-white shadow-sm font-black text-xl hover:bg-gray-100 active:scale-90 transition-all">-</button>
+                    <div className="flex flex-col items-center">
+                      <span className="text-5xl font-black tracking-tighter">{weight}</span>
+                      <span className="text-[10px] font-black text-gray-300 uppercase">KGS</span>
+                    </div>
+                    <button onClick={() => setWeight(weight + 1)} className="w-12 h-12 rounded-2xl bg-white shadow-sm font-black text-xl hover:bg-gray-100 active:scale-90 transition-all">+</button>
                   </div>
                 </div>
-                <div className={`p-4 rounded-2xl transition-all ${goal === Goal.MAINTAIN ? 'bg-gray-100 opacity-70 cursor-not-allowed' : 'bg-black text-white'}`}>
-                    <label className={`block text-sm font-bold mb-2 text-center ${goal === Goal.MAINTAIN ? 'text-gray-500' : 'text-gray-300'}`}>Target Weight (kg)</label>
-                    <div className="flex items-center justify-center gap-4">
-                      {goal === Goal.MAINTAIN ? (
-                         <span className="text-3xl font-heading font-bold w-20 text-center text-gray-500">{targetWeight}</span>
-                      ) : (
-                        <>
-                          <button onClick={() => adjustTargetWeight(-1)} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-lg disabled:opacity-30">-</button>
-                          <span className="text-3xl font-heading font-bold w-20 text-center">{targetWeight}</span>
-                          <button onClick={() => adjustTargetWeight(1)} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white font-bold text-lg disabled:opacity-30">+</button>
-                        </>
-                      )}
+                
+                {goal !== Goal.MAINTAIN && (
+                  <div className="bg-black text-white p-6 rounded-[32px] shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10"><Target size={80}/></div>
+                    <label className="block text-[10px] font-black uppercase text-gray-500 mb-4 text-center tracking-widest relative z-10">Target Weight</label>
+                    <div className="flex items-center justify-center gap-8 relative z-10">
+                      <button onClick={() => setTargetWeight(Math.max(30, targetWeight - 1))} className="w-12 h-12 rounded-2xl bg-white/10 font-black text-xl hover:bg-white/20 active:scale-90 transition-all">-</button>
+                      <div className="flex flex-col items-center">
+                        <span className="text-5xl font-black tracking-tighter">{targetWeight}</span>
+                        <span className="text-[10px] font-black text-white/30 uppercase">KGS</span>
+                      </div>
+                      <button onClick={() => setTargetWeight(targetWeight + 1)} className="w-12 h-12 rounded-2xl bg-white/10 font-black text-xl hover:bg-white/20 active:scale-90 transition-all">+</button>
                     </div>
+                  </div>
+                )}
+
+                <div className="bg-gray-50 p-6 rounded-[32px] border border-gray-100">
+                  <div className="flex justify-between items-center mb-4">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Timeline</label>
+                    <div className="bg-black text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">{durationWeeks} Weeks</div>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="4" max="52" step="1"
+                    value={durationWeeks}
+                    onChange={(e) => setDurationWeeks(Number(e.target.value))}
+                    className="w-full accent-black h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <div className="flex justify-between mt-2 text-[8px] font-black text-gray-300 uppercase tracking-widest">
+                    <span>Rapid</span>
+                    <span>Sustainable</span>
+                  </div>
                 </div>
-              </div>
-              <div className="pt-2">
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-sm font-bold text-gray-700">Timeline</label>
-                  <span className="text-sm font-bold text-primary bg-primary/10 px-2 py-1 rounded">{durationWeeks} Weeks</span>
-                </div>
-                <input 
-                  type="range" 
-                  min="4" max="52" step="1"
-                  value={durationWeeks}
-                  onChange={(e) => setDurationWeeks(Number(e.target.value))}
-                  className="w-full accent-black h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
               </div>
             </div>
           )}
 
-          <button
-            onClick={handleNext}
-            disabled={step === 1 && (!name || age === '')}
-            className="w-full mt-auto bg-black text-white py-4 px-6 rounded-2xl font-bold text-lg hover:scale-[1.02] transition-transform flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl"
-          >
-            {step === 3 ? (initialData ? "Save Changes" : "Start My Journey") : "Next Step"} <ChevronRight size={20} />
-          </button>
+          {step === 4 && (
+            <div className="space-y-8 animate-fade-in flex flex-col flex-1 py-4">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-xl">
+                  <Check className="text-green-500" size={40} strokeWidth={3} />
+                </div>
+                <h2 className="text-3xl font-black tracking-tight mb-1">Your Plan</h2>
+                <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Summary & Confirmation</p>
+              </div>
+
+              <div className="bg-gray-50 p-8 rounded-[40px] border border-gray-100 space-y-6 relative group transition-all">
+                <div className="space-y-4">
+                  <p 
+                    className="text-gray-600 font-medium leading-relaxed text-center italic"
+                    dangerouslySetInnerHTML={{ __html: getSummaryMessage() }}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 pt-6 border-t border-gray-100">
+                   <div className="text-center">
+                      <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Height</div>
+                      <div className="text-lg font-black">{heightCM} cm</div>
+                   </div>
+                   <div className="text-center border-l border-gray-100">
+                      <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Age</div>
+                      <div className="text-lg font-black">{age} yrs</div>
+                   </div>
+                </div>
+              </div>
+              
+              <div className="space-y-3 mt-auto">
+                <button
+                  onClick={handleNext}
+                  disabled={countdown > 0}
+                  className={`w-full py-6 rounded-[32px] font-black text-xl shadow-2xl flex items-center justify-center gap-3 transition-all relative overflow-hidden ${
+                    countdown > 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-black text-white active:scale-95'
+                  }`}
+                >
+                  {countdown > 0 && (
+                    <div 
+                      className="absolute inset-0 bg-black/5" 
+                      style={{ width: `${((5 - countdown) / 5) * 100}%`, transition: 'width 1s linear' }}
+                    />
+                  )}
+                  <span className="relative z-10">
+                    {countdown > 0 ? `Please Read (${countdown}s)` : "Yeahh, that's right!"}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setStep(1)}
+                  className="w-full py-4 rounded-[24px] font-black text-[10px] uppercase tracking-widest text-gray-400 hover:text-black flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Edit2 size={12}/> Edit choices
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step < 4 && (
+            <button
+              onClick={handleNext}
+              disabled={step === 1 && (!name || heightCM === '' || age === '')}
+              className="w-full mt-auto bg-black text-white py-5 px-6 rounded-[32px] font-black text-lg hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-2xl"
+            >
+              Continue <ChevronRight size={22} />
+            </button>
+          )}
         </div>
       </div>
     </div>

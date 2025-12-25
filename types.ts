@@ -48,6 +48,16 @@ export interface UserProfile {
   dailyWaterGoal?: number;
   scansUsedToday?: number;
   lastScanResetDate?: string;
+  upiId?: string;
+  points?: number;
+  referralCode: string;
+  referredBy?: string; 
+  hasClaimedSignupReferral?: boolean;
+  currentStreak?: number;
+  lastLoginDate?: string;
+  uniqueTransferCode?: string;
+  email?: string;
+  isDisabled?: boolean;
 }
 
 export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
@@ -63,6 +73,7 @@ export interface FoodAnalysis {
   timestamp: string;
   imageUrl?: string;
   mealType: MealType;
+  alternatives: string[];
 }
 
 export interface ScanHistoryItem extends FoodAnalysis {
