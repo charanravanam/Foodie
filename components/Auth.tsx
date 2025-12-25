@@ -25,9 +25,9 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
     setLoading(true);
     try {
       await sendPasswordResetEmail(auth, email);
-      setMessage("Recovery link dispatched! Check your inbox.");
+      setMessage("Link dispatched! Check your inbox.");
     } catch (err: any) {
-      setError(err.message || "Failed to send recovery email.");
+      setError(err.message || "Failed to send link.");
     } finally {
       setLoading(false);
     }
@@ -40,7 +40,6 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
     setError(null);
     setLoading(true);
 
-    // ADMIN LOGIN CHECK
     if (email.toLowerCase() === 'admin' && password === 'adminfoodie') {
       onAdminLogin(true);
       setLoading(false);
@@ -58,11 +57,10 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
         }
       }
     } catch (err: any) {
-      console.error("Auth Error:", err);
-      let msg = "An unexpected error occurred.";
+      let msg = "Unexpected error occurred.";
       if (err.code === 'auth/wrong-password') msg = "Incorrect password.";
-      if (err.code === 'auth/user-not-found') msg = "No account found.";
-      if (err.code === 'auth/email-already-in-use') msg = "Node already exists with this email.";
+      if (err.code === 'auth/user-not-found') msg = "No node found.";
+      if (err.code === 'auth/email-already-in-use') msg = "Node already exists.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -72,41 +70,41 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white font-sans">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl transition-transform hover:scale-110">
-            {isForgotPassword ? <Key className="text-white" size={32} /> : <ShieldAlert className="text-white" size={32} />}
+        <div className="text-center mb-6">
+          <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-xl transition-transform hover:scale-110">
+            {isForgotPassword ? <Key className="text-white" size={28} /> : <ShieldAlert className="text-white" size={28} />}
           </div>
-          <h1 className="text-2xl font-black tracking-tight">
+          <h1 className="text-xl font-black tracking-tight">
             {isForgotPassword ? 'Reset Access' : (isLogin ? 'Welcome Back' : 'Create Account')}
           </h1>
-          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
-            {isForgotPassword ? 'Recover your terminal node' : (isLogin ? 'Log in to your terminal' : 'Join the elite nutrition network')}
+          <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1.5">
+            {isForgotPassword ? 'Recover your terminal' : (isLogin ? 'Log in to your terminal' : 'Join the health network')}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-2">
             <div className="relative">
-              <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
               <input
                 type="text"
                 placeholder="Email Address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-14 pr-4 py-5 bg-gray-50 rounded-[24px] border-none focus:ring-2 focus:ring-black focus:outline-none font-bold transition-all shadow-inner"
+                className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[20px] border-none focus:ring-1 focus:ring-black font-bold transition-all shadow-inner text-sm"
                 required
               />
             </div>
             
             {!isForgotPassword && (
               <div className="relative animate-fade-in">
-                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
                 <input
                   type="password"
-                  placeholder={isLogin ? "Password" : "Create a password"}
+                  placeholder={isLogin ? "Password" : "Create password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-14 pr-4 py-5 bg-gray-50 rounded-[24px] border-none focus:ring-2 focus:ring-black focus:outline-none font-bold transition-all shadow-inner"
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[20px] border-none focus:ring-1 focus:ring-black font-bold transition-all shadow-inner text-sm"
                   required
                 />
               </div>
@@ -114,53 +112,50 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
 
             {!isLogin && !isForgotPassword && (
               <div className="relative animate-fade-in">
-                <Gift className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                <Gift className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
                 <input
                   type="text"
-                  placeholder="Referral Code (Optional)"
+                  placeholder="Referral (Optional)"
                   value={referralCode}
                   onChange={(e) => setReferralCode(e.target.value)}
-                  className="w-full pl-14 pr-4 py-5 bg-gray-50 rounded-[24px] border-none focus:ring-2 focus:ring-black focus:outline-none font-bold transition-all shadow-inner uppercase"
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[20px] border-none focus:ring-1 focus:ring-black font-bold transition-all shadow-inner uppercase text-sm"
                 />
               </div>
             )}
           </div>
 
-          {error && <div className="p-4 bg-red-50 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-2xl text-center border border-red-100 animate-fade-in">{error}</div>}
-          {message && <div className="p-4 bg-green-50 text-green-500 text-[10px] font-black uppercase tracking-widest rounded-2xl text-center border border-green-100 animate-fade-in">{message}</div>}
+          {error && <div className="p-3 bg-red-50 text-red-500 text-[8px] font-black uppercase tracking-widest rounded-xl text-center border border-red-100">{error}</div>}
+          {message && <div className="p-3 bg-green-50 text-green-500 text-[8px] font-black uppercase tracking-widest rounded-xl text-center border border-green-100">{message}</div>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-black text-white py-5 rounded-[24px] font-black text-lg shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+            className="w-full bg-black text-white py-4 rounded-[20px] font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 mt-2"
           >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : (isForgotPassword ? 'SEND RECOVERY' : (isLogin ? 'LOG IN' : 'ESTABLISH NODE'))}
+            {loading ? <Loader2 className="animate-spin" size={18} /> : (isForgotPassword ? 'SEND RECOVERY' : (isLogin ? 'LOG IN' : 'ESTABLISH NODE'))}
           </button>
         </form>
 
-        <div className="mt-8 space-y-4 text-center">
+        <div className="mt-6 space-y-3 text-center">
           {isLogin && !isForgotPassword && (
             <button
               type="button"
               onClick={() => setIsForgotPassword(true)}
-              className="text-[10px] font-black text-gray-300 uppercase tracking-widest hover:text-black transition-colors flex items-center justify-center gap-2 mx-auto"
+              className="text-[9px] font-black text-gray-300 uppercase tracking-widest hover:text-black transition-colors flex items-center justify-center gap-1.5 mx-auto"
             >
-              <HelpCircle size={12}/> Forgot Password?
+              <HelpCircle size={10}/> Forgot Password?
             </button>
           )}
           
           <button
             type="button"
             onClick={() => {
-              if (isForgotPassword) {
-                setIsForgotPassword(false);
-              } else {
-                setIsLogin(!isLogin);
-              }
+              setIsForgotPassword(false);
+              setIsLogin(!isLogin);
               setError(null);
               setMessage(null);
             }}
-            className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors"
+            className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors"
           >
             {isForgotPassword ? "Back to Login" : (isLogin ? "Need an account? Sign Up" : "Already have an account? Log In")}
           </button>
