@@ -2,8 +2,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { UserProfile, WorkoutLocation, MuscleGroup, Exercise } from "../types";
 
-const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY = 1500;
+const MAX_RETRIES = 2;
+const INITIAL_RETRY_DELAY = 1000;
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -27,10 +27,9 @@ export const generateWorkoutRoutine = async (
 
     Requirements:
     1. Provide 4-6 exercises.
-    2. Exercises must be appropriate for the location (${location}). If 'Home', focus on bodyweight or common home items. If 'Gym', use typical gym equipment.
-    3. Each exercise must include: name, sets (number), reps (string like '8-10' or '12-15'), and a concise clinical description.
+    2. Exercises must be appropriate for the location (${location}).
+    3. Include: name, sets (number), reps (string), and a concise description.
     4. Provide a 'muscleGroups' array for each exercise.
-    5. 'imageUrl' should be left as empty string or a generic valid placeholder URL.
   `;
 
   try {
@@ -79,19 +78,17 @@ export const analyzeFoodImage = async (
 
   const systemPrompt = `
     You are Dr Foodie, an elite medical-grade nutrition AI. 
-    Analyze the provided food image for a user with goal: ${userProfile.goal}.
+    Analyze the food image for user goal: ${userProfile.goal}.
     
-    CRITICAL INSTRUCTION:
-    If the image is blurry, contains multiple ambiguous items, or you lack context for portion size that drastically affects accuracy, set "needsClarification" to true and provide a "clarificationQuestion" for the user.
-    If you have enough information, set "needsClarification" to false and provide the full metabolic breakdown.
+    CRITICAL:
+    If blurry or ambiguous, set "needsClarification" to true + provide "clarificationQuestion".
+    Otherwise, set to false and provide metabolic data.
 
-    Full JSON Output Requirements (when needsClarification is false):
+    JSON Output:
     1. foodName, calories, protein, carbs, fat, healthScore (1-10).
     2. mealType: 'Breakfast', 'Lunch', 'Dinner', 'Snack'.
-    3. microAnalysis: One high-impact clinical sentence.
-    4. alternatives: Exactly 3 healthier options for their goal.
-
-    User Context: ${additionalInfo || 'None provided.'}
+    3. microAnalysis: One clinical sentence.
+    4. alternatives: Exactly 3 healthier options.
   `;
 
   let lastError: any;
@@ -102,7 +99,7 @@ export const analyzeFoodImage = async (
         contents: {
           parts: [
             { inlineData: { mimeType, data: base64Image } },
-            { text: "Dr Foodie, analyze this meal. If unsure, ask a question. Otherwise provide full JSON." },
+            { text: "Dr Foodie, analyze this meal fast." },
           ],
         },
         config: {
@@ -133,12 +130,12 @@ export const analyzeFoodImage = async (
       return JSON.parse(text);
     } catch (error: any) {
       lastError = error;
-      if ((error?.status === 429 || error?.status === 503 || error?.status === 500) && attempt < MAX_RETRIES - 1) {
-        await sleep(INITIAL_RETRY_DELAY * Math.pow(2, attempt));
+      if ((error?.status === 429 || error?.status === 500) && attempt < MAX_RETRIES - 1) {
+        await sleep(INITIAL_RETRY_DELAY);
         continue;
       }
       break;
     }
   }
-  throw new Error(lastError?.message || "Dr Foodie is currently over-capacity.");
+  throw new Error(lastError?.message || "Over capacity.");
 };

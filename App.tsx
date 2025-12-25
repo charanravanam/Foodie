@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { 
   Home, BarChart2, Settings, Plus, Flame, ChevronRight, ArrowLeft, ArrowRight,
@@ -6,7 +7,8 @@ import {
   ScanLine, Wallet as WalletIcon, Gift, Users, Coins, Send, 
   ShieldCheck, ShieldAlert, DollarSign, Search, History, Heart, 
   Mail, Key, Share, Sparkle, Ban, UserX, Gem, Lock, Zap as Lightning,
-  Shield, Bell, HelpCircle, Info, ChevronDown, Image, MessageCircle, Trash2
+  Shield, Bell, HelpCircle, Info, ChevronDown, Image, MessageCircle, Trash2,
+  Edit3, CreditCard
 } from 'lucide-react';
 import { onAuthStateChanged, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -32,6 +34,36 @@ const formatCoins = (num: number) => {
   if (num < 100000) return num.toLocaleString();
   if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
   return (num / 1000).toFixed(0) + 'k';
+};
+
+const resizeImage = (base64Str: string, maxWidth = 1024, maxHeight = 1024): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height *= maxWidth / width;
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width *= maxHeight / height;
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
+    };
+  });
 };
 
 const WalletForm: React.FC<{
@@ -166,6 +198,260 @@ const ClarificationModal: React.FC<{
   );
 };
 
+const ReferralView: React.FC<{ profile: UserProfile | null; onBack: () => void }> = ({ profile, onBack }) => {
+  const referralLink = `https://drfoodie.app/join?ref=${profile?.referralCode}`;
+  
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert("Copied to clipboard!");
+  };
+
+  return (
+    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
+          <ArrowLeft size={18}/>
+        </button>
+        <h1 className="text-2xl font-black tracking-tight text-black">Network</h1>
+      </div>
+
+      <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 text-center space-y-6">
+        <div className="w-20 h-20 bg-blue-50 rounded-[32px] flex items-center justify-center mx-auto shadow-inner">
+          <Users className="text-blue-500" size={40} />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black tracking-tighter">Grow the Network</h2>
+          <p className="text-gray-400 text-xs font-bold leading-relaxed px-4">
+            Onboard new nodes and earn <span className="text-black">100 coins</span> per referral. Secure an additional <span className="text-black">250 coins</span> when they upgrade to PRO.
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-black text-white p-8 rounded-[40px] shadow-2xl space-y-4">
+        <div className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] text-center">YOUR UNIQUE NODE CODE</div>
+        <div className="bg-white/5 border border-white/10 p-5 rounded-2xl text-center flex items-center justify-center gap-3 group active:scale-95 transition-all cursor-pointer" onClick={() => copyToClipboard(profile?.referralCode || '')}>
+          <span className="text-3xl font-black tracking-[0.2em]">{profile?.referralCode}</span>
+          <Share size={20} className="text-gray-500" />
+        </div>
+        <p className="text-[9px] text-gray-500 font-bold text-center uppercase tracking-widest">Tap code to copy and transmit</p>
+      </div>
+
+      <div className="space-y-2">
+         <button onClick={() => copyToClipboard(referralLink)} className="w-full bg-white text-black py-4 rounded-[24px] font-black text-xs shadow-card border border-gray-100 active:scale-95 transition-all flex items-center justify-center gap-2">
+           <Send size={14}/> TRANSMIT INVITE LINK
+         </button>
+      </div>
+    </div>
+  );
+};
+
+const WorkoutLocationView: React.FC<{ onBack: () => void; onSelect: (loc: WorkoutLocation) => void }> = ({ onBack, onSelect }) => {
+  return (
+    <div className="pt-6 space-y-8 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
+          <ArrowLeft size={18}/>
+        </button>
+        <h1 className="text-2xl font-black tracking-tight text-black">Protocol</h1>
+      </div>
+
+      <div className="space-y-4">
+        <div className="text-center space-y-1">
+          <h2 className="text-3xl font-black tracking-tighter">Select Environment</h2>
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Deploy workout routine based on assets</p>
+        </div>
+
+        <div className="grid gap-4">
+          <button onClick={() => onSelect(WorkoutLocation.HOME)} className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 flex flex-col items-center text-center space-y-4 active:scale-[0.98] transition-all hover:border-black">
+             <div className="w-16 h-16 bg-blue-50 rounded-[24px] flex items-center justify-center">
+                <Home className="text-blue-500" size={32} />
+             </div>
+             <div>
+                <div className="text-xl font-black">Home Base</div>
+                <div className="text-[10px] font-bold text-gray-400 uppercase mt-1">Bodyweight & Minimal Tools</div>
+             </div>
+          </button>
+
+          <button onClick={() => onSelect(WorkoutLocation.GYM)} className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 flex flex-col items-center text-center space-y-4 active:scale-[0.98] transition-all hover:border-black">
+             <div className="w-16 h-16 bg-purple-50 rounded-[24px] flex items-center justify-center">
+                <Dumbbell className="text-purple-500" size={32} />
+             </div>
+             <div>
+                <div className="text-xl font-black">Clinical Gym</div>
+                <div className="text-[10px] font-bold text-gray-400 uppercase mt-1">Full Equipment & Machines</div>
+             </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const WorkoutFocusView: React.FC<{ 
+  location: WorkoutLocation; 
+  selectedGroups: MuscleGroup[]; 
+  onToggle: (g: MuscleGroup) => void; 
+  onGenerate: () => void; 
+  onBack: () => void; 
+}> = ({ location, selectedGroups, onToggle, onGenerate, onBack }) => {
+  return (
+    <div className="pt-6 space-y-8 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
+          <ArrowLeft size={18}/>
+        </button>
+        <h1 className="text-2xl font-black tracking-tight text-black">Focus</h1>
+      </div>
+
+      <div className="space-y-6">
+        <div className="text-center space-y-1">
+          <h2 className="text-3xl font-black tracking-tighter">Target Nodes</h2>
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Select muscle groups for optimization</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {Object.values(MuscleGroup).map((g) => (
+            <button key={g} onClick={() => onToggle(g)} className={`p-5 rounded-[28px] font-black text-xs transition-all border ${selectedGroups.includes(g) ? 'bg-black text-white border-black shadow-xl scale-[1.02]' : 'bg-white text-gray-400 border-gray-100 shadow-sm'}`}>
+              {g}
+            </button>
+          ))}
+        </div>
+
+        <button onClick={onGenerate} disabled={selectedGroups.length === 0} className="w-full bg-black text-white py-5 rounded-[24px] font-black text-sm shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-40 mt-4">
+          <Zap size={18} className="fill-white"/> INITIALIZE GENERATION
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const WorkoutPlanView: React.FC<{ routine: Exercise[]; isGenerating: boolean; onBack: () => void }> = ({ routine, isGenerating, onBack }) => {
+  if (isGenerating) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-10 space-y-6 text-center animate-pulse">
+        <div className="w-20 h-20 bg-black rounded-[32px] flex items-center justify-center shadow-2xl">
+          <Loader2 className="animate-spin text-white" size={40} />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black tracking-tight uppercase">Computing Routine</h2>
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Mapping Metabolic Response...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
+          <ArrowLeft size={18}/>
+        </button>
+        <h1 className="text-2xl font-black tracking-tight text-black">Routine</h1>
+      </div>
+
+      <div className="space-y-4">
+        {routine.map((ex, i) => (
+          <div key={i} className="bg-white p-6 rounded-[36px] shadow-card border border-gray-100 space-y-4 group">
+            <div className="flex justify-between items-start">
+               <div className="bg-black text-white px-3 py-1 rounded-full text-[8px] font-black tracking-widest">STEP 0{i+1}</div>
+               <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
+                  <Flame size={10} className="text-orange-500 fill-orange-500"/>
+                  <span className="text-[10px] font-black">{ex.sets} × {ex.reps}</span>
+               </div>
+            </div>
+            <div>
+              <h3 className="text-xl font-black tracking-tight">{ex.name}</h3>
+              <p className="text-gray-500 text-xs font-medium leading-relaxed mt-2">{ex.description}</p>
+            </div>
+            <div className="flex flex-wrap gap-1.5 pt-2">
+               {ex.muscleGroups.map((mg, j) => (
+                 <span key={j} className="text-[7px] font-black uppercase tracking-widest bg-gray-50 text-gray-400 px-2 py-1 rounded-md border border-gray-100">{mg}</span>
+               ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-black text-white p-8 rounded-[40px] text-center space-y-3 shadow-2xl mt-4">
+         <CheckCircle2 size={32} className="mx-auto text-green-400" />
+         <h4 className="text-xl font-black tracking-tight">Sequence Ready</h4>
+         <p className="text-gray-500 text-[9px] font-bold uppercase tracking-widest px-4">Follow the protocol exactly for peak performance</p>
+      </div>
+    </div>
+  );
+};
+
+const AnalysisDetailView: React.FC<{ analysis: ScanHistoryItem | null; isAnalyzing: boolean; onBack: () => void; onDelete: () => void }> = ({ analysis, isAnalyzing, onBack, onDelete }) => {
+  if (isAnalyzing) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-10 space-y-6 text-center">
+        <div className="w-24 h-24 bg-black rounded-[40px] flex items-center justify-center shadow-2xl relative">
+          <div className="absolute inset-0 bg-white/20 rounded-[40px] animate-ping" />
+          <ScanLine className="text-white animate-bounce" size={40} />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black tracking-tight">Dr Foodie Analyzing</h2>
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Extracting Metabolic Data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!analysis) return null;
+
+  return (
+    <div className="h-full flex flex-col animate-fade-in overflow-hidden">
+      <div className="relative h-2/5 shrink-0">
+        <img src={analysis.imageUrl} className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
+        <button onClick={onBack} className="absolute top-8 left-6 p-4 bg-black/20 backdrop-blur-md rounded-2xl text-white active:scale-95 transition-all"><ArrowLeft size={20}/></button>
+        <button onClick={onDelete} className="absolute top-8 right-6 p-4 bg-red-500/20 backdrop-blur-md rounded-2xl text-red-400 active:scale-95 transition-all"><Trash2 size={20}/></button>
+        <div className="absolute bottom-8 left-8 right-8">
+           <div className="text-[10px] font-black text-white/50 uppercase tracking-[0.4em] mb-2">{analysis.mealType} • {new Date(analysis.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+           <h1 className="text-4xl font-black text-white tracking-tighter">{analysis.foodName}</h1>
+        </div>
+      </div>
+
+      <div className="bg-[#F2F2F7] -mt-6 rounded-t-[40px] flex-1 overflow-y-auto no-scrollbar p-8 space-y-6 pb-40 relative z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.1)]">
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            { label: 'Energy', val: analysis.calories, unit: 'kcal', icon: <Flame size={12}/> },
+            { label: 'Protein', val: analysis.protein, unit: 'g', icon: <Activity size={12}/> },
+            { label: 'Carbs', val: analysis.carbs, unit: 'g', icon: <Target size={12}/> },
+            { label: 'Fat', val: analysis.fat, unit: 'g', icon: <Heart size={12}/> },
+          ].map((stat, i) => (
+            <div key={i} className="bg-white p-4 rounded-[24px] text-center border border-gray-50 shadow-sm">
+               <div className="flex justify-center mb-1 text-black/10">{stat.icon}</div>
+               <div className="text-base font-black tracking-tighter leading-none">{stat.val}</div>
+               <div className="text-[7px] font-black text-gray-300 uppercase tracking-widest mt-1">{stat.unit}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
+           <div className="flex justify-between items-center mb-4">
+              <h3 className="text-[9px] font-black uppercase text-gray-400 tracking-widest px-1">Dr Foodie Insights</h3>
+              <div className="bg-black text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">SCORE: {analysis.healthScore}/10</div>
+           </div>
+           <p className="text-sm font-bold text-gray-700 leading-relaxed italic border-l-4 border-black pl-4">"{analysis.microAnalysis}"</p>
+        </div>
+
+        <div className="space-y-3">
+           <h3 className="text-[9px] font-black uppercase text-gray-400 tracking-widest px-1">Metabolic Alternatives</h3>
+           <div className="grid grid-cols-1 gap-2">
+             {analysis.alternatives.map((alt, i) => (
+               <div key={i} className="bg-white/50 border border-gray-100 p-4 rounded-2xl flex items-center justify-between group hover:bg-white hover:shadow-sm transition-all">
+                 <span className="text-xs font-black text-gray-600">{alt}</span>
+                 <Sparkle size={14} className="text-yellow-500 opacity-20 group-hover:opacity-100 transition-opacity" />
+               </div>
+             ))}
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -187,7 +473,7 @@ const App: React.FC = () => {
   const [isGeneratingRoutine, setIsGeneratingRoutine] = useState(false);
   
   const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [allWithdrawals, setAllWithdrawals] = useState<any[]>([]);
+  const [allPayments, setAllPayments] = useState<any[]>([]);
   const [allTransfers, setAllTransfers] = useState<any[]>([]);
   const [selectedAdminUser, setSelectedAdminUser] = useState<any>(null);
   const [adminSearch, setAdminSearch] = useState('');
@@ -248,17 +534,18 @@ const App: React.FC = () => {
         snapshot.forEach(doc => list.push({ uid: doc.id, ...doc.data() }));
         setAllUsers(list);
       });
-      const unsubWithdrawals = onSnapshot(query(collection(db, "withdrawals"), orderBy("timestamp", "desc")), (snapshot) => {
+      // Listening to payments log (Upgrade events)
+      const unsubPayments = onSnapshot(query(collection(db, "payments"), orderBy("timestamp", "desc")), (snapshot) => {
         const list: any[] = [];
         snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-        setAllWithdrawals(list);
+        setAllPayments(list);
       });
       const unsubTransfers = onSnapshot(query(collection(db, "transfers"), orderBy("timestamp", "desc")), (snapshot) => {
         const list: any[] = [];
         snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
         setAllTransfers(list);
       });
-      return () => { unsubUsers(); unsubWithdrawals(); unsubTransfers(); };
+      return () => { unsubUsers(); unsubPayments(); unsubTransfers(); };
     }
   }, [isAdmin]);
 
@@ -362,6 +649,16 @@ const App: React.FC = () => {
       await runTransaction(db, async (tx) => {
         const userRef = doc(db, "profiles", user.uid);
         tx.update(userRef, { isPremium: true });
+        
+        // Log payment
+        const payRef = doc(collection(db, "payments"));
+        tx.set(payRef, {
+           uid: user.uid,
+           userName: profile.name,
+           amount: 49,
+           timestamp: Timestamp.now()
+        });
+
         if (profile.referredBy) {
           const refQuery = query(collection(db, "profiles"), where("referralCode", "==", profile.referredBy));
           const refSnap = await getDocs(refQuery);
@@ -458,19 +755,20 @@ const App: React.FC = () => {
     setView('analysis');
     setClarificationQuestion(null);
     try {
-      const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+      const optimizedBase64 = await resizeImage(base64);
+      const base64Data = optimizedBase64.includes(',') ? optimizedBase64.split(',')[1] : optimizedBase64;
       const result = await analyzeFoodImage(base64Data, profile, clarification);
       
       if (result.needsClarification) {
         setClarificationQuestion(result.clarificationQuestion);
-        setPendingImage(base64);
+        setPendingImage(optimizedBase64);
         setIsAnalyzing(false);
         return;
       }
 
       const scanItem: Omit<ScanHistoryItem, 'id'> = {
         ...result,
-        imageUrl: base64,
+        imageUrl: optimizedBase64,
         timestamp: new Date().toISOString(),
       };
       const docRef = await addDoc(collection(db, "profiles", user.uid, "scans"), scanItem);
@@ -544,7 +842,7 @@ const App: React.FC = () => {
   return (
     <div className="max-w-md mx-auto min-h-screen bg-[#F2F2F7] text-black relative shadow-2xl flex flex-col font-sans overflow-hidden">
       <canvas ref={canvasRef} className="hidden" />
-      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={e => {
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={async (e) => {
         const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = () => processImage(r.result as string); r.readAsDataURL(f); }
       }} />
 
@@ -554,7 +852,7 @@ const App: React.FC = () => {
             view={view} 
             setView={setView} 
             allUsers={allUsers} 
-            allWithdrawals={allWithdrawals} 
+            allPayments={allPayments} 
             allTransfers={allTransfers} 
             adminSearch={adminSearch} 
             setAdminSearch={setAdminSearch}
@@ -653,6 +951,15 @@ const App: React.FC = () => {
         <button onClick={()=>{ if (!isAdmin) setView('stats'); }} disabled={isAdmin} className={`transition-all duration-300 ${(!isAdmin && view==='stats')?'text-black scale-105':'text-black/20'}`}>{!isAdmin && <BarChart2 size={22}/>}</button>
         <button onClick={()=>setView('settings')} className={`transition-all duration-300 ${view==='settings' || view === 'team' || view === 'wallet' || view === 'refer' || view === 'update_profile' ?'text-black scale-105':'text-black/20'}`}><Settings size={22}/></button>
       </nav>
+
+      {clarificationQuestion && pendingImage && (
+        <ClarificationModal 
+          question={clarificationQuestion} 
+          onAnswer={(answer) => processImage(pendingImage, answer)} 
+          onApprox={() => processImage(pendingImage, "Take approximate value")}
+          onCancel={() => { setClarificationQuestion(null); setPendingImage(null); setView('home'); }}
+        />
+      )}
 
       <PremiumModal isOpen={showPremium} onClose={()=>setShowPremium(false)} onUpgrade={handleUpgradeToPremium} />
 
@@ -893,174 +1200,6 @@ const StatsView: React.FC<{ scans: ScanHistoryItem[]; currentCalTarget: number; 
   );
 };
 
-const AnalysisDetailView: React.FC<{ analysis: ScanHistoryItem | null; isAnalyzing: boolean; onBack: () => void; onDelete: () => void }> = ({ analysis, isAnalyzing, onBack, onDelete }) => (
-  <div className="pt-0 h-full overflow-y-auto no-scrollbar pb-32 bg-white">
-    {isAnalyzing ? (
-      <div className="flex flex-col items-center justify-center py-32 space-y-3 px-6">
-        <Loader2 className="animate-spin text-black" size={36} />
-        <p className="font-black text-gray-400 uppercase tracking-widest text-[8px]">Establishing Data Node...</p>
-      </div>
-    ) : analysis ? (
-      <div className="animate-fade-in">
-        <div className="relative">
-          <img src={analysis.imageUrl} className="w-full h-[40vh] object-cover shadow-2xl" />
-          <div className="absolute top-5 left-5 right-5 flex justify-between items-center">
-            <button onClick={onBack} className="p-3 bg-white/20 backdrop-blur-xl rounded-2xl text-white active:scale-95 transition-all border border-white/30 shadow-lg">
-              <ArrowLeft size={20}/>
-            </button>
-            <button onClick={onDelete} className="p-3 bg-red-500/20 backdrop-blur-xl rounded-2xl text-white active:scale-95 transition-all border border-red-500/30 shadow-lg">
-              <Trash2 size={20}/>
-            </button>
-          </div>
-          <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white to-transparent" />
-        </div>
-        
-        <div className="px-6 -mt-10 relative z-10 space-y-8 pb-10">
-          <div className="flex justify-between items-end">
-            <div className="min-w-0">
-              <h2 className="text-4xl font-black tracking-tighter leading-[0.9] text-black break-words">{analysis.foodName}</h2>
-              <div className="text-[9px] text-gray-400 font-black uppercase tracking-widest mt-4 flex items-center gap-1.5">
-                <Clock size={10}/> {analysis.mealType} NODE
-              </div>
-            </div>
-            <div className="bg-black text-white px-5 py-3 rounded-[24px] text-center shadow-xl flex-shrink-0 mb-1">
-              <div className="text-xl font-black leading-none">{analysis.healthScore}</div>
-              <div className="text-[7px] font-black uppercase opacity-40 mt-1">SCORE</div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-[9px] font-black uppercase text-gray-400 tracking-[0.4em] px-1">MICRO STATS</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-[#F2F2F7] p-6 rounded-[30px] flex flex-col justify-between h-24">
-                <span className="text-[8px] font-black text-gray-400 uppercase">Kcal</span>
-                <span className="text-2xl font-black text-black">{analysis.calories}</span>
-              </div>
-              <div className="bg-red-50 p-6 rounded-[30px] flex flex-col justify-between h-24 border border-red-100/30">
-                <span className="text-[8px] font-black text-red-300 uppercase">Protein</span>
-                <span className="text-2xl font-black text-red-500">{analysis.protein}g</span>
-              </div>
-              <div className="bg-orange-50 p-6 rounded-[30px] flex flex-col justify-between h-24 border border-orange-100/30">
-                <span className="text-[8px] font-black text-orange-300 uppercase">Carbs</span>
-                <span className="text-2xl font-black text-orange-500">{analysis.carbs}g</span>
-              </div>
-              <div className="bg-blue-50 p-6 rounded-[30px] flex flex-col justify-between h-24 border border-blue-100/30">
-                <span className="text-[8px] font-black text-blue-300 uppercase">Fats</span>
-                <span className="text-2xl font-black text-blue-500">{analysis.fat}g</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-[9px] font-black uppercase text-gray-400 tracking-[0.4em] px-1">HEALTHY SWAPS</h3>
-            <div className="space-y-3">
-              {analysis.alternatives?.map((alt, idx) => (
-                <div key={idx} className="bg-white p-5 rounded-[28px] border border-gray-100 flex items-center gap-4 shadow-sm active:scale-98 transition-all">
-                  <div className="w-10 h-10 bg-black text-white rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
-                    <Sparkle size={18} className="fill-white"/>
-                  </div>
-                  <p className="font-bold text-sm tracking-tight text-gray-800 leading-tight">{alt}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-gray-900 text-white p-8 rounded-[36px] relative overflow-hidden">
-            <Activity size={100} className="absolute -right-6 -bottom-6 opacity-5" />
-            <p className="text-[13px] font-bold leading-relaxed relative z-10 italic text-gray-300">"{analysis.microAnalysis}"</p>
-          </div>
-        </div>
-      </div>
-    ) : null}
-  </div>
-);
-
-const ReferralView: React.FC<{ profile: UserProfile | null; onBack: () => void }> = ({ profile, onBack }) => {
-  const shareCode = async () => {
-    if (!profile) return;
-    const msg = `Secure your node on Dr Foodie: ${profile.referralCode}. Rewards reveal at Airdrop launch! 🚀`;
-    if (navigator.share) { await navigator.share({ title: 'Dr Foodie', text: msg, url: window.location.href }); }
-    else { await navigator.clipboard.writeText(msg); alert("Code secured!"); }
-  };
-  return (
-    <div className="pt-4 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
-        <h1 className="text-2xl font-black tracking-tight">Referral</h1>
-      </div>
-      <div className="bg-black text-white p-10 rounded-[40px] text-center relative overflow-hidden shadow-2xl border border-white/5">
-         <div className="absolute top-0 left-0 w-full h-full opacity-30 luxury-shimmer pointer-events-none" />
-         <div className="w-14 h-14 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-5 backdrop-blur-md"><Gift size={28} className="text-yellow-400" /></div>
-         <h2 className="text-2xl font-black mb-1.5 tracking-tighter">Expand Nodes</h2>
-         <p className="text-gray-500 text-[8px] font-black uppercase tracking-[0.2em] px-3">Both get 100 coins. Collect before reveal.</p>
-         <div className="mt-8 bg-white/5 p-5 rounded-[24px] border border-white/10 group cursor-pointer active:scale-95 transition-all" onClick={shareCode}>
-            <div className="text-[8px] font-black uppercase text-gray-500 tracking-[0.3em] mb-1.5">NODE CODE</div>
-            <div className="text-3xl font-black tracking-widest text-white flex items-center justify-center gap-2">{profile?.referralCode} <Share size={16} className="text-white/20"/></div>
-         </div>
-      </div>
-    </div>
-  );
-};
-
-const WorkoutLocationView: React.FC<{ onBack: () => void; onSelect: (loc: WorkoutLocation) => void }> = ({ onBack, onSelect }) => (
-  <div className="pt-8 space-y-10 animate-fade-in px-6">
-    <div className="flex items-center gap-3">
-      <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
-      <div className="space-y-0.5">
-        <h1 className="text-2xl font-black tracking-tight text-black">Location</h1>
-        <p className="text-[8px] font-black uppercase text-gray-400 tracking-[0.3em]">CHOOSE ZONE</p>
-      </div>
-    </div>
-    <div className="space-y-4">
-      <button onClick={() => onSelect(WorkoutLocation.GYM)} className="w-full bg-white p-8 rounded-[40px] shadow-card border border-gray-100 flex items-center gap-6 active:scale-95 transition-all text-left">
-        <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-black shadow-inner flex-shrink-0"><Dumbbell size={24} /></div>
-        <div className="min-w-0"><h3 className="text-lg font-black tracking-tight">Public Gym</h3><p className="text-xs font-bold text-gray-300">Advanced equipment</p></div>
-      </button>
-      <button onClick={() => onSelect(WorkoutLocation.HOME)} className="w-full bg-white p-8 rounded-[40px] shadow-card border border-gray-100 flex items-center gap-6 active:scale-95 transition-all text-left">
-        <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-black shadow-inner flex-shrink-0"><Home size={24} /></div>
-        <div className="min-w-0"><h3 className="text-lg font-black tracking-tight">Home Space</h3><p className="text-xs font-bold text-gray-300">Minimal gear</p></div>
-      </button>
-    </div>
-  </div>
-);
-
-const WorkoutFocusView: React.FC<{ location: WorkoutLocation; selectedGroups: MuscleGroup[]; onToggle: (g: MuscleGroup) => void; onGenerate: () => void; onBack: () => void; }> = ({ location, selectedGroups, onToggle, onGenerate, onBack }) => (
-  <div className="pt-6 space-y-6 animate-fade-in px-6 pb-48 h-full overflow-y-auto no-scrollbar">
-    <div className="flex items-center justify-between"><button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card"><ArrowLeft size={18}/></button><div className="bg-black text-white px-3 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest">{location}</div></div>
-    <h1 className="text-4xl font-black tracking-tighter text-black px-1">Target Focus</h1>
-    <div className="space-y-2">
-      {Object.values(MuscleGroup).map((group) => (
-        <button key={group} onClick={() => onToggle(group)} className={`w-full p-6 rounded-[28px] flex items-center justify-between transition-all border ${selectedGroups.includes(group) ? 'bg-black text-white border-black scale-102 shadow-xl' : 'bg-white text-black border-gray-50 shadow-card'}`}>
-          <span className="text-base font-black tracking-tight">{group}</span>
-          {selectedGroups.includes(group) ? <CheckCircle2 size={20} className="text-yellow-400"/> : <Plus size={20} className="text-gray-200" />}
-        </button>
-      ))}
-    </div>
-    <button onClick={onGenerate} disabled={selectedGroups.length === 0} className="fixed bottom-28 left-8 right-8 bg-black text-white py-5 rounded-[24px] font-black text-base shadow-2xl flex items-center justify-center gap-2 active:scale-95 disabled:opacity-30 transition-all z-10">Generate Routine <ChevronRight size={20}/></button>
-  </div>
-);
-
-const WorkoutPlanView: React.FC<{ routine: Exercise[]; isGenerating: boolean; onBack: () => void }> = ({ routine, isGenerating, onBack }) => {
-  if (isGenerating) return <div className="flex flex-col items-center justify-center h-[75vh] animate-pulse px-8"><div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-xl mb-8 border border-gray-100"><Loader2 className="animate-spin text-black" size={28}/></div><h3 className="text-xl font-black tracking-tighter text-center">Optimizing Node...</h3></div>;
-  return (
-    <div className="pt-6 space-y-6 animate-fade-in px-6 pb-32 overflow-y-auto h-full no-scrollbar">
-      <div className="flex items-center justify-between"><button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card"><ArrowLeft size={18}/></button></div>
-      <h1 className="text-4xl font-black tracking-tighter text-black">Your Plan</h1>
-      <div className="space-y-3">
-        {routine.map((ex, idx) => (
-          <div key={idx} className="bg-white p-5 rounded-[36px] shadow-card border border-gray-100 flex gap-5 items-center">
-            <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0"><Dumbbell size={18} className="text-gray-200" /></div>
-            <div className="flex-1 min-w-0">
-               <div className="flex justify-between items-start mb-0.5"><h4 className="text-base font-black leading-tight truncate pr-1">{ex.name}</h4><div className="bg-black text-white px-2 py-0.5 rounded-md text-[8px] font-black">{ex.sets}x{ex.reps}</div></div>
-               <p className="text-[9px] font-bold text-gray-300 leading-tight uppercase line-clamp-2">{ex.description}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 const TeamSection: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   return (
     <div className="pt-6 h-full overflow-y-auto no-scrollbar pb-32 px-5">
@@ -1106,14 +1245,14 @@ const AdminPanel: React.FC<{
   view: string; 
   setView: (v: any) => void; 
   allUsers: any[]; 
-  allWithdrawals: any[]; 
+  allPayments: any[]; 
   allTransfers: any[]; 
   adminSearch: string; 
   setAdminSearch: (v: string) => void;
   selectedAdminUser: any;
   setSelectedAdminUser: (u: any) => void;
   setIsAdmin: (s: boolean) => void;
-}> = ({ view, setView, allUsers, allWithdrawals, allTransfers, adminSearch, setAdminSearch, selectedAdminUser, setSelectedAdminUser, setIsAdmin }) => {
+}> = ({ view, setView, allUsers, allPayments, allTransfers, adminSearch, setAdminSearch, selectedAdminUser, setSelectedAdminUser, setIsAdmin }) => {
   const stats = useMemo(() => {
     const pCount = allUsers.filter(u => u.isPremium).length;
     return {
@@ -1126,6 +1265,9 @@ const AdminPanel: React.FC<{
 
   const filteredUsers = allUsers.filter(u => (u.name || '').toLowerCase().includes(adminSearch.toLowerCase()));
 
+  // Local state for manually editing user coins in detail view
+  const [editCoins, setEditCoins] = useState('');
+
   return (
     <div className="animate-fade-in px-5 pb-32 overflow-y-auto h-full no-scrollbar pt-8">
       {view === 'admin_dashboard' && (
@@ -1135,12 +1277,12 @@ const AdminPanel: React.FC<{
              <div className="bg-green-500 w-2 h-2 rounded-full animate-pulse shadow-green-500 shadow-lg"/>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white p-5 rounded-[28px] shadow-card border border-gray-100 text-center">
+            <div className="bg-white p-5 rounded-[28px] shadow-card border border-gray-100 text-center" onClick={() => setView('admin_users')}>
               <Users size={20} className="text-blue-500 mb-1.5 mx-auto"/>
               <div className="text-2xl font-black">{stats.users}</div>
               <div className="text-[8px] font-black uppercase text-gray-400 tracking-widest">Total Nodes</div>
             </div>
-            <div className="bg-black text-white p-5 rounded-[28px] shadow-card text-center">
+            <div className="bg-black text-white p-5 rounded-[28px] shadow-card text-center" onClick={() => setView('admin_payments')}>
               <DollarSign size={20} className="text-yellow-400 mb-1.5 mx-auto"/>
               <div className="text-2xl font-black">₹{stats.revenue}</div>
               <div className="text-[8px] font-black uppercase text-gray-500 tracking-widest">Revenue (PRO)</div>
@@ -1163,6 +1305,33 @@ const AdminPanel: React.FC<{
         </div>
       )}
 
+      {view === 'admin_payments' && (
+        <div className="space-y-5 animate-fade-in">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setView('admin_dashboard')} className="p-3 bg-white rounded-2xl shadow-card"><ArrowLeft size={18}/></button>
+            <h1 className="text-2xl font-black tracking-tight">Payments Log</h1>
+          </div>
+          <div className="space-y-3">
+            {allPayments.length === 0 ? (
+              <div className="p-10 text-center text-gray-400 font-black text-[10px] uppercase">No upgrade events detected</div>
+            ) : (
+              allPayments.map(p => (
+                <div key={p.id} className="bg-white p-5 rounded-[28px] shadow-card border border-gray-50 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-green-500"><CreditCard size={20}/></div>
+                    <div>
+                      <div className="font-black text-sm leading-tight">{p.userName || 'Anonymous Node'}</div>
+                      <div className="text-[8px] text-gray-400 font-bold uppercase">{new Date(p.timestamp?.toDate()).toLocaleString()}</div>
+                    </div>
+                  </div>
+                  <div className="text-lg font-black text-black">₹{p.amount}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       {view === 'admin_users' && (
         <div className="space-y-5">
           <h1 className="text-2xl font-black tracking-tight">Directory</h1>
@@ -1172,7 +1341,7 @@ const AdminPanel: React.FC<{
           </div>
           <div className="space-y-2">
             {filteredUsers.map(u => (
-              <div key={u.uid} onClick={() => { setSelectedAdminUser(u); setView('admin_user_detail'); }} className="bg-white p-4 rounded-[24px] flex items-center justify-between shadow-card active:scale-95 transition-all">
+              <div key={u.uid} onClick={() => { setSelectedAdminUser(u); setEditCoins(u.points?.toString() || '0'); setView('admin_user_detail'); }} className="bg-white p-4 rounded-[24px] flex items-center justify-between shadow-card active:scale-95 transition-all">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center font-black text-gray-400 text-xs">{u.name?.charAt(0)}</div>
                   <div className="min-w-0">
@@ -1208,23 +1377,67 @@ const AdminPanel: React.FC<{
       )}
 
       {view === 'admin_user_detail' && selectedAdminUser && (
-        <div className="space-y-6 pb-20">
+        <div className="space-y-6 pb-20 animate-fade-in">
           <div className="flex items-center gap-3">
             <button onClick={() => setView('admin_users')} className="p-3 bg-white rounded-2xl shadow-card"><ArrowLeft size={18}/></button>
             <h1 className="text-xl font-black">Control Panel</h1>
           </div>
           <div className="bg-white p-7 rounded-[36px] shadow-card space-y-6">
             <div className="flex items-center gap-5 pb-5 border-b border-gray-50">
-               <div className="w-16 h-16 bg-black text-white rounded-2xl flex items-center justify-center font-black text-2xl">{selectedAdminUser.name?.charAt(0)}</div>
-               <div className="min-w-0"><div className="text-xl font-black truncate">{selectedAdminUser.name}</div><div className="text-[9px] font-black uppercase text-gray-400 truncate">{selectedAdminUser.email}</div></div>
+               <div className="w-16 h-16 bg-black text-white rounded-2xl flex items-center justify-center font-black text-2xl relative">
+                 {selectedAdminUser.name?.charAt(0)}
+                 {selectedAdminUser.isPremium && <Crown size={12} className="absolute -top-1 -right-1 text-yellow-400 fill-yellow-400"/>}
+               </div>
+               <div className="min-w-0">
+                 <div className="text-xl font-black truncate">{selectedAdminUser.name}</div>
+                 <div className="text-[9px] font-black uppercase text-gray-400 truncate">{selectedAdminUser.email}</div>
+               </div>
             </div>
-            <div className="space-y-2">
+
+            {/* Manual Edit Section */}
+            <div className="space-y-4">
+               <div>
+                  <label className="text-[8px] font-black uppercase text-gray-400 px-1 mb-2 block tracking-widest">Adjust Balance (Coins)</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="number" 
+                      value={editCoins} 
+                      onChange={(e) => setEditCoins(e.target.value)}
+                      className="flex-1 bg-gray-50 p-4 rounded-xl font-black text-sm outline-none focus:ring-1 focus:ring-black"
+                    />
+                    <button 
+                      onClick={async () => {
+                         const pts = parseInt(editCoins) || 0;
+                         await updateDoc(doc(db, "profiles", selectedAdminUser.uid), { points: pts });
+                         alert("Vault balance updated.");
+                      }}
+                      className="bg-black text-white px-4 rounded-xl font-black text-xs active:scale-95 transition-all"
+                    >Save</button>
+                  </div>
+               </div>
+
+               <button 
+                  onClick={async () => {
+                    const next = !selectedAdminUser.isPremium;
+                    await updateDoc(doc(db, "profiles", selectedAdminUser.uid), { isPremium: next });
+                    setSelectedAdminUser({...selectedAdminUser, isPremium: next});
+                    alert(`Pro Access ${next ? 'Granted' : 'Revoked'}.`);
+                  }}
+                  className={`w-full p-5 rounded-[24px] font-black text-xs flex items-center justify-between ${selectedAdminUser.isPremium ? 'bg-yellow-50 text-yellow-600' : 'bg-gray-50 text-gray-600'}`}
+               >
+                 <div className="flex items-center gap-3"><Crown size={16}/> {selectedAdminUser.isPremium ? 'Revoke Pro Access' : 'Grant Pro Membership'}</div>
+                 <ChevronRight size={16}/>
+               </button>
+            </div>
+
+            <div className="space-y-2 pt-4 border-t border-gray-50">
                <button onClick={async () => {
                   const next = !selectedAdminUser.isDisabled;
                   await updateDoc(doc(db, "profiles", selectedAdminUser.uid), { isDisabled: next });
                   setSelectedAdminUser({...selectedAdminUser, isDisabled: next});
+                  alert(`Access ${next ? 'Disabled' : 'Enabled'}.`);
                }} className={`w-full p-5 rounded-[24px] font-black text-xs flex items-center justify-between ${selectedAdminUser.isDisabled ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}`}>
-                 <div className="flex items-center gap-3">{selectedAdminUser.isDisabled ? <CheckCircle2 size={16}/> : <Ban size={16}/>} {selectedAdminUser.isDisabled ? 'Re-enable Node' : 'Disable Node'}</div>
+                 <div className="flex items-center gap-3">{selectedAdminUser.isDisabled ? <CheckCircle2 size={16}/> : <Ban size={16}/>} {selectedAdminUser.isDisabled ? 'Re-enable Node' : 'Disable Node Access'}</div>
                  <ChevronRight size={16}/>
                </button>
                <button onClick={async () => {
@@ -1232,7 +1445,7 @@ const AdminPanel: React.FC<{
                     await deleteDoc(doc(db, "profiles", selectedAdminUser.uid));
                     setView('admin_users');
                   }
-               }} className="w-full p-5 rounded-[24px] bg-red-50 text-red-600 font-black text-xs flex items-center justify-center">
+               }} className="w-full p-5 rounded-[24px] bg-red-50 text-red-600 font-black text-xs flex items-center justify-between">
                  <div className="flex items-center gap-3"><UserX size={16}/> Purge Data</div>
                  <ChevronRight size={16}/>
                </button>
