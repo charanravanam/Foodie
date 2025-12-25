@@ -29,10 +29,7 @@ const PREMIUM_REFERRAL_COINS = 250;
 
 const TEAM_MEMBERS = [
   { name: 'Charan Ravanam', role: 'Founder & CEO', bio: 'Visionary behind Dr Foodie, focusing on metabolic health and AI integration.', icon: <Sparkles className="text-yellow-500" /> },
-  { name: 'Kranthi Madireddy', role: 'Chief Product Officer', bio: 'Driving user experience and clinical product roadmap.', icon: <Target className="text-blue-500" /> },
-  { name: 'Amogha', role: 'Head of AI Research', bio: 'Leading the development of Dr Foodie\'s clinical vision models.', icon: <Zap className="text-purple-500" /> },
-  { name: 'Jathin', role: 'Lead Developer', bio: 'Scaling the infrastructure and real-time metabolic engines.', icon: <Activity className="text-green-500" /> },
-  { name: 'Srikanth', role: 'Clinical Nutrition Lead', bio: 'Ensuring every micro-analysis meets medical-grade precision.', icon: <Heart className="text-red-500" /> },
+  { name: 'Kranthi Madireddy', role: 'Top Member', bio: 'Driving user experience and clinical product roadmap.', icon: <Target className="text-blue-500" /> },
 ];
 
 const formatCoins = (num: number) => {
@@ -1154,7 +1151,7 @@ const TeamSection: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 </div>
                 <div>
                   <h4 className="text-xl font-black text-black leading-tight">{m.name}</h4>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Associate Node</p>
+                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">{m.role}</p>
                 </div>
               </div>
             ))}
