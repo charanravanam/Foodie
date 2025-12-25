@@ -107,7 +107,7 @@ const WalletForm: React.FC<{
               type="text" 
               placeholder="Unique Code (INR-XXXXXX)" 
               value={transferCode} 
-              onChange={(e) => setTransferCode(e.target.toUpperCase())}
+              onChange={(e) => setTransferCode(e.target.value.toUpperCase())}
               className="w-full p-4 rounded-xl bg-gray-50 font-bold border-none outline-none focus:ring-1 focus:ring-black transition-all text-base"
             />
             <input 
@@ -317,7 +317,7 @@ const App: React.FC = () => {
           let newStreak = (pData.lastLoginDate === yesterdayStr) ? (pData.currentStreak || 0) + 1 : 1;
           let bonusCoins = 0;
 
-          if (newStreak === 30) bonusCoins = 200 * RUEE_TO_COINS;
+          if (newStreak === 30) bonusCoins = 200 * RUPEE_TO_COINS;
           if (newStreak === 60) bonusCoins = 500 * RUPEE_TO_COINS;
           if (newStreak === 90) bonusCoins = 999 * RUPEE_TO_COINS;
 
@@ -433,10 +433,8 @@ const App: React.FC = () => {
     return currentDayFilteredScans.reduce((acc, s) => acc + (s.calories || 0), 0);
   }, [currentDayFilteredScans]);
 
-  // Fix: Implemented handleGenerateRoutine to call Gemini service and update state
   const handleGenerateRoutine = async () => {
     if (!profile || !selectedLocation || selectedMuscleGroups.length === 0) return;
-    
     setIsGeneratingRoutine(true);
     setView('workout_plan');
     try {
@@ -444,7 +442,7 @@ const App: React.FC = () => {
       setCurrentRoutine(routine);
     } catch (err) {
       console.error("Routine Generation Error:", err);
-      alert("Failed to generate workout routine. Please check your connection.");
+      alert("Failed to generate workout routine.");
       setView('workout_focus');
     } finally {
       setIsGeneratingRoutine(false);
@@ -587,10 +585,9 @@ const App: React.FC = () => {
                   </div>
                 </header>
                 
-                {/* Horizontal Date Picker with Gaps */}
-                <div className="flex justify-between mb-6 overflow-x-auto no-scrollbar py-2 gap-2">
+                <div className="flex justify-between mb-6 overflow-x-auto no-scrollbar py-2 gap-3">
                   {getWeekDays().map((d, i) => (
-                    <button key={i} onClick={() => setSelectedDate(d.toDateString())} className={`flex flex-col items-center min-w-[50px] py-4 rounded-[22px] transition-all duration-300 ${d.toDateString() === selectedDate ? 'bg-black text-white shadow-xl scale-105' : 'bg-white text-gray-300'}`}>
+                    <button key={i} onClick={() => setSelectedDate(d.toDateString())} className={`flex flex-col items-center min-w-[52px] py-4 rounded-[22px] transition-all duration-300 ${d.toDateString() === selectedDate ? 'bg-black text-white shadow-xl scale-105' : 'bg-white text-gray-300 border border-gray-50'}`}>
                       <span className="text-[9px] font-black uppercase mb-1">{d.toLocaleDateString('en-US',{weekday:'short'}).charAt(0)}</span>
                       <span className="text-base font-black">{d.getDate()}</span>
                     </button>
@@ -648,16 +645,6 @@ const App: React.FC = () => {
         )}
       </div>
 
-      {clarificationQuestion && (
-        <ClarificationModal 
-          question={clarificationQuestion} 
-          onAnswer={(ans) => processImage(pendingImage!, ans)} 
-          onApprox={() => processImage(pendingImage!, "Use approximate values for everything.")}
-          onCancel={() => { setClarificationQuestion(null); setPendingImage(null); setView('home'); }}
-        />
-      )}
-
-      {/* Scaled down nav */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-gray-100 p-4 pb-8 flex justify-between items-center z-40 max-w-md mx-auto px-8 shadow-floating">
         <button onClick={()=>{setView(isAdmin ? 'admin_dashboard' : 'home')}} className={`transition-all duration-300 ${(view==='home' || view==='admin_dashboard')?'text-black scale-105':'text-black/20'}`}><Home size={22}/></button>
         <button onClick={()=>{ if (isAdmin) setView('admin_payments'); else setView('workout_location'); }} className={`transition-all duration-300 ${(view.startsWith('workout') || view === 'admin_payments')?'text-black scale-105':'text-black/20'}`}>{isAdmin ? <DollarSign size={22}/> : <Dumbbell size={22}/>}</button>
@@ -693,7 +680,6 @@ const App: React.FC = () => {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .shadow-card { box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
         .shadow-floating { box-shadow: 0 15px 30px rgba(0,0,0,0.08); }
-        
         .luxury-shimmer {
           background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
           background-size: 200% 100%;
@@ -705,8 +691,6 @@ const App: React.FC = () => {
   );
 };
 
-// --- SETTINGS SECTION (Compacted) ---
-
 const SettingsSection: React.FC<{
   profile: UserProfile | null;
   onViewWallet: () => void;
@@ -717,7 +701,7 @@ const SettingsSection: React.FC<{
   onLogout: () => void;
   onBack: () => void;
 }> = ({ profile, onViewWallet, onViewRefer, onUpdateProfile, onShowPremium, onViewTeam, onLogout, onBack }) => (
-  <div className="pt-6 space-y-8 h-full overflow-y-auto no-scrollbar pb-32 px-4">
+  <div className="pt-6 space-y-6 h-full overflow-y-auto no-scrollbar pb-32 px-4">
     <div className="flex items-center gap-3">
       <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
         <ArrowLeft size={18}/>
@@ -728,7 +712,7 @@ const SettingsSection: React.FC<{
       </div>
     </div>
 
-    <div className="bg-white p-6 rounded-[36px] shadow-card border border-gray-100 flex items-center gap-5">
+    <div className="bg-white p-5 rounded-[36px] shadow-card border border-gray-100 flex items-center gap-4">
       <div className="w-14 h-14 bg-black text-white rounded-2xl flex items-center justify-center font-black text-2xl shadow-xl relative flex-shrink-0">
         {profile?.name?.charAt(0)}
         {profile?.isPremium && (
@@ -745,17 +729,17 @@ const SettingsSection: React.FC<{
       </div>
     </div>
 
-    <div className="space-y-3">
-      <div className="bg-white rounded-[32px] shadow-card border border-gray-100 overflow-hidden">
-        <div className="p-3 px-6 pt-5 text-[8px] font-black text-gray-300 uppercase tracking-widest">ASSETS</div>
+    <div className="space-y-2">
+      <div className="bg-white rounded-[28px] shadow-card border border-gray-100 overflow-hidden">
+        <div className="p-2 px-6 pt-4 text-[8px] font-black text-gray-300 uppercase tracking-widest">ASSETS</div>
         <div className="divide-y divide-gray-50">
           <SettingItem icon={<Gem size={16} className="text-yellow-500"/>} title="My Vault" value={formatCoins(profile?.points || 0)} onClick={onViewWallet} />
           <SettingItem icon={<Gift size={16} className="text-blue-500"/>} title="Refer & Earn" onClick={onViewRefer} />
         </div>
       </div>
 
-      <div className="bg-white rounded-[32px] shadow-card border border-gray-100 overflow-hidden">
-        <div className="p-3 px-6 pt-5 text-[8px] font-black text-gray-300 uppercase tracking-widest">CONFIG</div>
+      <div className="bg-white rounded-[28px] shadow-card border border-gray-100 overflow-hidden">
+        <div className="p-2 px-6 pt-4 text-[8px] font-black text-gray-300 uppercase tracking-widest">CONFIG</div>
         <div className="divide-y divide-gray-50">
           <SettingItem icon={<UserIcon size={16} className="text-purple-500"/>} title="Update Profile" onClick={onUpdateProfile} />
           <SettingItem icon={<Crown size={16} className="text-yellow-400"/>} title="Premium Access" highlight onClick={onShowPremium} />
@@ -763,25 +747,25 @@ const SettingsSection: React.FC<{
         </div>
       </div>
 
-      <div className="bg-white rounded-[32px] shadow-card border border-gray-100 overflow-hidden">
-        <div className="p-3 px-6 pt-5 text-[8px] font-black text-gray-300 uppercase tracking-widest">SYSTEM</div>
+      <div className="bg-white rounded-[28px] shadow-card border border-gray-100 overflow-hidden">
+        <div className="p-2 px-6 pt-4 text-[8px] font-black text-gray-300 uppercase tracking-widest">SYSTEM</div>
         <div className="divide-y divide-gray-50">
           <SettingItem icon={<Shield size={16} className="text-green-500"/>} title="Security & Privacy" />
           <SettingItem icon={<HelpCircle size={16} className="text-gray-400"/>} title="Help Center" />
         </div>
       </div>
 
-      <button onClick={onLogout} className="w-full p-6 text-red-500 bg-white rounded-[32px] shadow-card flex items-center justify-center gap-2 font-black text-sm active:scale-95 transition-all border border-red-50 mt-2">
-        <LogOut size={18}/> Logout Terminal
+      <button onClick={onLogout} className="w-full p-5 text-red-500 bg-white rounded-[28px] shadow-card flex items-center justify-center gap-2 font-black text-sm active:scale-95 transition-all border border-red-50 mt-1">
+        <LogOut size={16}/> Logout Terminal
       </button>
     </div>
   </div>
 );
 
 const SettingItem: React.FC<{ icon: React.ReactNode; title: string; value?: string; onClick?: () => void; highlight?: boolean }> = ({ icon, title, value, onClick, highlight }) => (
-  <button onClick={onClick} className={`w-full p-4 px-6 flex items-center justify-between transition-all active:bg-gray-50 ${highlight ? 'bg-black/5' : ''}`}>
-    <div className="flex items-center gap-4">
-      <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center">
+  <button onClick={onClick} className={`w-full p-3.5 px-6 flex items-center justify-between transition-all active:bg-gray-50 ${highlight ? 'bg-black/5' : ''}`}>
+    <div className="flex items-center gap-3">
+      <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center">
         {icon}
       </div>
       <div className="text-left">
@@ -789,11 +773,9 @@ const SettingItem: React.FC<{ icon: React.ReactNode; title: string; value?: stri
         {value && <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{value}</div>}
       </div>
     </div>
-    <ChevronRight size={14} className="text-gray-200"/>
+    <ChevronRight size={12} className="text-gray-200"/>
   </button>
 );
-
-// --- STATS VIEW (Revamped Growth Matrix) ---
 
 const StatsView: React.FC<{ scans: ScanHistoryItem[]; currentCalTarget: number; profile: UserProfile | null; onBack: () => void }> = ({ scans, currentCalTarget, profile, onBack }) => {
   const last7Days = useMemo(() => {
@@ -830,7 +812,6 @@ const StatsView: React.FC<{ scans: ScanHistoryItem[]; currentCalTarget: number; 
         <h1 className="text-2xl font-black tracking-tighter">Growth Matrix</h1>
       </div>
 
-      {/* BMI Section */}
       {bmiData && (
         <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 flex items-center justify-between overflow-hidden relative group">
            <div className="absolute top-0 left-0 w-1.5 h-full bg-black group-hover:w-3 transition-all duration-500" />
@@ -843,7 +824,6 @@ const StatsView: React.FC<{ scans: ScanHistoryItem[]; currentCalTarget: number; 
         </div>
       )}
 
-      {/* Attractive Rewards Section */}
       <div className="bg-white p-6 rounded-[40px] shadow-card border border-gray-100 space-y-6 relative overflow-hidden">
          <div className="flex justify-between items-center relative z-10">
             <h3 className="text-[9px] font-black uppercase text-gray-400 tracking-[0.2em] flex items-center gap-1.5 px-1">
@@ -856,38 +836,39 @@ const StatsView: React.FC<{ scans: ScanHistoryItem[]; currentCalTarget: number; 
          
          <div className="space-y-3 relative z-10">
             {[
-               { days: 30, amount: '200', reached: (profile?.currentStreak || 0) >= 30, grad: "from-blue-600/90 to-blue-800/90" },
-               { days: 60, amount: '500', reached: (profile?.currentStreak || 0) >= 60, grad: "from-indigo-600/90 to-indigo-800/90" },
-               { days: 90, amount: '999', reached: (profile?.currentStreak || 0) >= 90, grad: "from-amber-500/90 to-amber-600/90" },
+               { days: 30, amount: '200', reached: (profile?.currentStreak || 0) >= 30, grad: "from-blue-600 to-blue-800", text: "Bronze Milestone" },
+               { days: 60, amount: '500', reached: (profile?.currentStreak || 0) >= 60, grad: "from-indigo-600 to-indigo-800", text: "Silver Milestone" },
+               { days: 90, amount: '999', reached: (profile?.currentStreak || 0) >= 90, grad: "from-amber-400 to-yellow-600", text: "Elite Gold Milestone" },
             ].map((m, i) => {
                const prog = Math.min(100, ((profile?.currentStreak || 0) / m.days) * 100);
                return (
-                 <div key={i} className={`p-5 rounded-[30px] flex items-center justify-between border-2 transition-all relative overflow-hidden group ${m.reached ? 'border-transparent shadow-xl bg-black text-white' : 'border-gray-50 bg-gray-50/50'}`}>
-                    {m.reached && <div className={`absolute inset-0 bg-gradient-to-r ${m.grad} mix-blend-overlay`} />}
+                 <div key={i} className={`p-5 rounded-[30px] flex items-center justify-between border transition-all relative overflow-hidden group ${m.reached ? 'border-transparent shadow-xl' : 'border-gray-50 bg-gray-50/30'}`}>
+                    {m.reached && <div className={`absolute inset-0 bg-gradient-to-r ${m.grad} opacity-90`} />}
                     <div className="flex items-center gap-4 relative z-10">
-                       <div className={`w-11 h-11 rounded-xl flex items-center justify-center backdrop-blur-md ${m.reached ? 'bg-white/20 text-white shadow-lg' : 'bg-white text-gray-300 shadow-sm'}`}>
+                       <div className={`w-11 h-11 rounded-xl flex items-center justify-center backdrop-blur-md ${m.reached ? 'bg-white/20 text-white shadow-lg' : 'bg-white text-gray-300 shadow-sm border border-gray-100'}`}>
                           {m.reached ? <CheckCircle2 size={18} strokeWidth={3} /> : <Lock size={16}/>}
                        </div>
                        <div>
-                          <div className="font-black text-base tracking-tight">{m.days} Days</div>
-                          <div className={`text-[8px] font-bold uppercase tracking-widest ${m.reached ? 'text-white/60' : 'text-gray-400'}`}>Reward Secure</div>
+                          <div className={`font-black text-base tracking-tight ${m.reached ? 'text-white' : 'text-gray-800'}`}>{m.days} Days</div>
+                          <div className={`text-[8px] font-bold uppercase tracking-widest ${m.reached ? 'text-white/70' : 'text-gray-400'}`}>{m.text}</div>
                        </div>
                     </div>
                     <div className="text-right relative z-10">
                       <div className={`text-xl font-black ${m.reached ? 'text-white' : 'text-gray-600'}`}>₹{m.amount}</div>
                       {!m.reached && (
                         <div className="w-16 h-1 bg-gray-200 rounded-full mt-1.5 overflow-hidden">
-                          <div className="h-full bg-black/20" style={{ width: `${prog}%` }} />
+                          <div className="h-full bg-black/10" style={{ width: `${prog}%` }} />
                         </div>
                       )}
-                      <div className={`text-[7px] font-black uppercase tracking-widest mt-1 ${m.reached ? 'text-white/70' : 'text-gray-300'}`}>
-                        {m.reached ? 'CLAIMED' : `${Math.round(prog)}% COMPLETE`}
+                      <div className={`text-[7px] font-black uppercase tracking-widest mt-1 ${m.reached ? 'text-white/80' : 'text-gray-300'}`}>
+                        {m.reached ? 'SECURED' : `${m.days - (profile?.currentStreak || 0)} Days Left`}
                       </div>
                     </div>
                  </div>
                );
             })}
          </div>
+         <p className="text-[7px] text-gray-400 font-bold uppercase tracking-widest text-center px-4">Rewards are credited to your vault automatically upon milestone completion.</p>
       </div>
 
       <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100">
@@ -912,8 +893,6 @@ const StatsView: React.FC<{ scans: ScanHistoryItem[]; currentCalTarget: number; 
     </div>
   );
 };
-
-// --- ANALYSIS VIEW (Compact) ---
 
 const AnalysisDetailView: React.FC<{ analysis: ScanHistoryItem | null; isAnalyzing: boolean; onBack: () => void; onDelete: () => void }> = ({ analysis, isAnalyzing, onBack, onDelete }) => (
   <div className="pt-0 h-full overflow-y-auto no-scrollbar pb-32 bg-white">
@@ -997,7 +976,6 @@ const AnalysisDetailView: React.FC<{ analysis: ScanHistoryItem | null; isAnalyzi
   </div>
 );
 
-// Other views remain largely the same but with compacting adjustments...
 const ReferralView: React.FC<{ profile: UserProfile | null; onBack: () => void }> = ({ profile, onBack }) => {
   const shareCode = async () => {
     if (!profile) return;
@@ -1209,7 +1187,7 @@ const AdminPanel: React.FC<{
           </div>
           <div className="space-y-3">
             {allTransfers.map(t => (
-              <div key={t.id} className="bg-white p-5 rounded-[28px] shadow-card border border-gray-50 flex items-center justify-between">
+              <div key={t.id} className="bg-white p-5 rounded-[28px] shadow-card border border-gray-100 flex items-center justify-between">
                 <div className="min-w-0">
                   <div className="font-black text-xs truncate max-w-[180px]">{t.fromName} → {t.toName}</div>
                   <div className="text-[8px] text-gray-300 font-bold uppercase">{new Date(t.timestamp?.toDate()).toLocaleString()}</div>
