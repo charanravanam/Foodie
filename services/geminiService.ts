@@ -72,27 +72,26 @@ export const generateWorkoutRoutine = async (
 export const analyzeFoodImage = async (
   base64Image: string,
   userProfile: UserProfile,
+  additionalInfo?: string,
   mimeType: string = "image/jpeg"
 ): Promise<any> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const systemPrompt = `
     You are Dr Foodie, an elite medical-grade nutrition AI. 
-    Analyze the provided food image with extreme precision for a user with the following profile:
-    Goal: ${userProfile.goal}
-    Current Weight: ${userProfile.weight}kg
-    Target Weight: ${userProfile.targetWeight}kg
-    Age/Gender: ${userProfile.age}y / ${userProfile.gender}
+    Analyze the provided food image for a user with goal: ${userProfile.goal}.
+    
+    CRITICAL INSTRUCTION:
+    If the image is blurry, contains multiple ambiguous items, or you lack context for portion size that drastically affects accuracy, set "needsClarification" to true and provide a "clarificationQuestion" for the user.
+    If you have enough information, set "needsClarification" to false and provide the full metabolic breakdown.
 
-    Requirements:
-    1. Identify the food item and estimate portion size.
-    2. Provide accurate Macros (Calories, Protein, Carbs, Fat).
-    3. Categorize 'mealType': 'Breakfast', 'Lunch', 'Dinner', 'Snack'.
-    4. Provide 'microAnalysis': One high-impact clinical sentence on the metabolic effect.
-    5. Health Score: 1-10 based on nutritional density.
-    6. Provide exactly 3 'alternatives': These must be healthier food choices within the same food category or meal type that would better serve the user's specific goal of ${userProfile.goal}.
+    Full JSON Output Requirements (when needsClarification is false):
+    1. foodName, calories, protein, carbs, fat, healthScore (1-10).
+    2. mealType: 'Breakfast', 'Lunch', 'Dinner', 'Snack'.
+    3. microAnalysis: One high-impact clinical sentence.
+    4. alternatives: Exactly 3 healthier options for their goal.
 
-    Output MUST be strictly JSON.
+    User Context: ${additionalInfo || 'None provided.'}
   `;
 
   let lastError: any;
@@ -103,7 +102,7 @@ export const analyzeFoodImage = async (
         contents: {
           parts: [
             { inlineData: { mimeType, data: base64Image } },
-            { text: "Dr Foodie, analyze this meal and provide the metabolic breakdown in JSON format." },
+            { text: "Dr Foodie, analyze this meal. If unsure, ask a question. Otherwise provide full JSON." },
           ],
         },
         config: {
@@ -112,6 +111,8 @@ export const analyzeFoodImage = async (
           responseSchema: {
             type: Type.OBJECT,
             properties: {
+              needsClarification: { type: Type.BOOLEAN },
+              clarificationQuestion: { type: Type.STRING },
               foodName: { type: Type.STRING },
               calories: { type: Type.NUMBER },
               protein: { type: Type.NUMBER },
@@ -120,13 +121,9 @@ export const analyzeFoodImage = async (
               healthScore: { type: Type.NUMBER },
               microAnalysis: { type: Type.STRING },
               mealType: { type: Type.STRING },
-              alternatives: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: "Three healthy alternative food choices."
-              }
+              alternatives: { type: Type.ARRAY, items: { type: Type.STRING } }
             },
-            required: ["foodName", "calories", "protein", "carbs", "fat", "healthScore", "microAnalysis", "mealType", "alternatives"],
+            required: ["needsClarification"],
           },
         },
       });
@@ -136,8 +133,6 @@ export const analyzeFoodImage = async (
       return JSON.parse(text);
     } catch (error: any) {
       lastError = error;
-      console.warn(`Analysis attempt ${attempt + 1} failed:`, error.message);
-      
       if ((error?.status === 429 || error?.status === 503 || error?.status === 500) && attempt < MAX_RETRIES - 1) {
         await sleep(INITIAL_RETRY_DELAY * Math.pow(2, attempt));
         continue;
@@ -145,5 +140,5 @@ export const analyzeFoodImage = async (
       break;
     }
   }
-  throw new Error(lastError?.message || "Dr Foodie is currently over-capacity. Please try again in a moment.");
+  throw new Error(lastError?.message || "Dr Foodie is currently over-capacity.");
 };

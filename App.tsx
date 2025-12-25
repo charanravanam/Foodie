@@ -3,14 +3,16 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { 
   Home, BarChart2, Settings, Plus, Flame, ChevronRight, ArrowLeft, ArrowRight,
   Camera, User as UserIcon, Dumbbell, LogOut, Crown, Loader2, TrendingUp,
-  Apple, Target, Zap, Star, Activity, Droplets, Calendar, Clock,
-  Trophy, CheckCircle2, Info, Timer, ZapOff, Play, X, Pause, SkipForward,
-  Scan, Sparkles, MapPin, Check, Image as ImageIcon, RefreshCcw, Maximize, ScanLine, Trash2, Wallet as WalletIcon, Gift, Award, Users, CreditCard, Coins, Save, Calculator, Copy, Share2, ShieldCheck, UserMinus, ShieldAlert, DollarSign, ListOrdered, UserCheck, Filter, Search, History, Heart, Ruler, Medal, Mail, Key, Briefcase, Linkedin, Github, Globe, Send, ExternalLink, BadgeCheck, Share, Sparkle, Ban, UserX, Gem, Lock, Zap as Lightning
+  Target, Zap, Activity, Clock, Trophy, CheckCircle2, X,
+  ScanLine, Wallet as WalletIcon, Gift, Users, Coins, Send, 
+  ShieldCheck, ShieldAlert, DollarSign, Search, History, Heart, 
+  Mail, Key, Share, Sparkle, Ban, UserX, Gem, Lock, Zap as Lightning,
+  Shield, Bell, HelpCircle, Info, ChevronDown, Image, MessageCircle, Trash2
 } from 'lucide-react';
 import { onAuthStateChanged, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { 
-  doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc, deleteDoc, where, updateDoc, increment, onSnapshot, Timestamp, runTransaction, limit
+  doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc, deleteDoc, where, updateDoc, increment, onSnapshot, Timestamp, runTransaction
 } from 'firebase/firestore';
 import Onboarding from './components/Onboarding';
 import PremiumModal from './components/PremiumModal';
@@ -26,11 +28,6 @@ const RUPEE_TO_COINS = 100;
 
 const SIGNUP_REFERRAL_COINS = 100;
 const PREMIUM_REFERRAL_COINS = 250;
-
-const TEAM_MEMBERS = [
-  { name: 'Charan Ravanam', role: 'Founder & CEO', bio: 'Visionary behind Dr Foodie, focusing on metabolic health and AI integration.', icon: <Sparkles className="text-yellow-500" /> },
-  { name: 'Kranthi Madireddy', role: 'Top Member', bio: 'Driving user experience and clinical product roadmap.', icon: <Target className="text-blue-500" /> },
-];
 
 const formatCoins = (num: number) => {
   if (!num) return '0';
@@ -49,15 +46,14 @@ const WalletForm: React.FC<{
   const [isProcessingTransfer, setIsProcessingTransfer] = useState(false);
 
   return (
-    <div className="pt-4 space-y-8 animate-fade-in pb-40 px-4 h-full overflow-y-auto no-scrollbar">
+    <div className="pt-4 space-y-8 animate-fade-in pb-40 px-6 h-full overflow-y-auto no-scrollbar">
       <div className="flex items-center gap-4">
         <button onClick={onBack} className="p-4 bg-white rounded-3xl shadow-card active:scale-95 transition-all">
           <ArrowLeft size={20}/>
         </button>
-        <h1 className="text-3xl font-black">Vault</h1>
+        <h1 className="text-3xl font-black tracking-tight text-black">Vault</h1>
       </div>
       
-      {/* Balance Card - Luxury Style */}
       <div className="bg-[#0A0A0A] text-white p-10 rounded-[56px] text-center relative overflow-hidden shadow-2xl border border-white/5">
          <div className="absolute top-0 left-0 w-full h-full opacity-30 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,rgba(255,215,0,0.15),transparent_70%)]" />
          <div className="text-[10px] font-black uppercase text-gray-600 tracking-[0.4em] mb-4">TOTAL ASSETS</div>
@@ -68,11 +64,10 @@ const WalletForm: React.FC<{
             <Gem className="text-yellow-500 animate-pulse" size={32} />
          </div>
          <div className="text-[10px] font-black text-yellow-400 bg-white/5 py-3 px-6 rounded-full inline-block mt-4 uppercase tracking-[0.2em] border border-white/5 backdrop-blur-md">
-           NODE ID: {profile?.uniqueTransferCode || 'Generating...'}
+           USER ID: {profile?.uniqueTransferCode || 'Generating...'}
          </div>
       </div>
 
-      {/* Airdrop Suspense Card - Simplified for clear understanding */}
       <div className="bg-gradient-to-br from-yellow-400 to-yellow-600 p-10 rounded-[56px] shadow-[0_20px_50px_rgba(234,179,8,0.3)] relative overflow-hidden group">
          <div className="absolute -right-10 -bottom-10 opacity-20 group-hover:scale-110 transition-transform duration-700">
             <Lightning size={160} className="text-white fill-white" />
@@ -90,7 +85,7 @@ const WalletForm: React.FC<{
                 After the launch, you can convert your coins into <span className="font-black">Real Money</span> and withdraw it directly into your bank account.
               </p>
               <p className="text-black/70 text-[12px] italic font-bold border-l-2 border-black/10 pl-3">
-                The exact cash value of 1 coin will be revealed during the launch. Earn as much as you can now!
+                The cash value of each coin will be revealed then itself. Collect as many as you can now!
               </p>
             </div>
             <div className="pt-4 flex items-center gap-4">
@@ -100,32 +95,31 @@ const WalletForm: React.FC<{
                </div>
                <div className="bg-white/20 backdrop-blur-md p-4 rounded-[28px] flex-1 text-center border border-white/30">
                   <div className="text-[8px] font-black uppercase opacity-50 tracking-widest mb-1">CONVERSION</div>
-                  <div className="text-lg font-black">SOON</div>
+                  <div className="text-lg font-black uppercase">Soon</div>
                </div>
             </div>
          </div>
       </div>
 
-      {/* Peer Transfer */}
-      <div className="bg-white p-10 rounded-[48px] shadow-card border border-gray-100 space-y-6">
+      <div className="bg-white p-8 rounded-[48px] shadow-card border border-gray-100 space-y-6">
          <div className="flex justify-between items-center">
-            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 px-1"><Send size={14}/> Network Transfer</h3>
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 px-1"><Send size={14}/> Peer Transfer</h3>
             <div className="text-[8px] font-black text-green-500 bg-green-50 px-2 py-1 rounded-md uppercase">Zero Fee</div>
          </div>
          <div className="space-y-4">
             <input 
               type="text" 
-              placeholder="Friend's Unique Code (INR-XXXXXX)" 
+              placeholder="Unique Code (INR-XXXXXX)" 
               value={transferCode} 
               onChange={(e) => setTransferCode(e.target.value.toUpperCase())}
-              className="w-full p-6 rounded-2xl bg-gray-50 font-bold border-none outline-none focus:ring-2 focus:ring-black transition-all"
+              className="w-full p-6 rounded-2xl bg-gray-50 font-bold border-none outline-none focus:ring-2 focus:ring-black transition-all text-lg"
             />
             <input 
               type="number" 
-              placeholder="Amount to Send" 
+              placeholder="Amount (Coins)" 
               value={transferAmount} 
               onChange={(e) => setTransferAmount(e.target.value)}
-              className="w-full p-6 rounded-2xl bg-gray-50 font-bold border-none outline-none focus:ring-2 focus:ring-black transition-all"
+              className="w-full p-6 rounded-2xl bg-gray-50 font-bold border-none outline-none focus:ring-2 focus:ring-black transition-all text-lg"
             />
             <button 
               onClick={async () => {
@@ -136,9 +130,42 @@ const WalletForm: React.FC<{
               disabled={isProcessingTransfer}
               className="w-full bg-black text-white py-5 rounded-[24px] font-black text-sm active:scale-95 transition-all disabled:opacity-50 shadow-xl"
             >
-              {isProcessingTransfer ? <Loader2 className="animate-spin" size={18}/> : "Authorize Transfer"}
+              {isProcessingTransfer ? <Loader2 className="animate-spin mx-auto" size={18}/> : "Authorize Transfer"}
             </button>
          </div>
+      </div>
+    </div>
+  );
+};
+
+const ClarificationModal: React.FC<{
+  question: string;
+  onAnswer: (answer: string) => void;
+  onApprox: () => void;
+  onCancel: () => void;
+}> = ({ question, onAnswer, onApprox, onCancel }) => {
+  const [answer, setAnswer] = useState('');
+  return (
+    <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
+      <div className="bg-white rounded-[40px] w-full max-w-sm p-8 shadow-2xl space-y-6">
+        <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto shadow-xl">
+           <MessageCircle className="text-white" size={32} />
+        </div>
+        <div className="text-center space-y-2">
+           <h3 className="text-2xl font-black tracking-tight">Quick Question</h3>
+           <p className="text-gray-500 font-bold leading-tight">{question}</p>
+        </div>
+        <textarea 
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          placeholder="Type your answer..."
+          className="w-full p-6 bg-gray-50 rounded-3xl font-bold border-none outline-none focus:ring-2 focus:ring-black transition-all h-32 resize-none"
+        />
+        <div className="space-y-3">
+           <button onClick={() => onAnswer(answer)} disabled={!answer.trim()} className="w-full bg-black text-white py-5 rounded-[24px] font-black text-sm shadow-xl active:scale-95 transition-all disabled:opacity-50">Submit Detail</button>
+           <button onClick={onApprox} className="w-full bg-gray-50 text-black py-4 rounded-[24px] font-black text-[11px] uppercase tracking-widest border border-gray-100 hover:bg-gray-100 transition-all">Take approximate value</button>
+           <button onClick={onCancel} className="w-full text-gray-400 font-bold text-[10px] uppercase tracking-widest py-2">Cancel Analysis</button>
+        </div>
       </div>
     </div>
   );
@@ -148,13 +175,16 @@ const App: React.FC = () => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [view, setView] = useState<'home' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team' | 'wallet' | 'refer' | 'admin_users' | 'admin_payments' | 'admin_transfers' | 'admin_user_detail' | 'admin_dashboard' | 'workout_location' | 'workout_focus' | 'workout_plan'>('home');
+  const [view, setView] = useState<'home' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team' | 'wallet' | 'refer' | 'admin_users' | 'admin_payments' | 'admin_transfers' | 'admin_user_detail' | 'admin_dashboard' | 'workout_location' | 'workout_focus' | 'workout_plan' | 'update_profile'>('home');
   const [scans, setScans] = useState<ScanHistoryItem[]>([]);
   const [showPremium, setShowPremium] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<ScanHistoryItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toDateString());
+  
+  const [clarificationQuestion, setClarificationQuestion] = useState<string | null>(null);
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
 
   const [selectedLocation, setSelectedLocation] = useState<WorkoutLocation | null>(null);
   const [selectedMuscleGroups, setSelectedMuscleGroups] = useState<MuscleGroup[]>([]);
@@ -244,7 +274,7 @@ const App: React.FC = () => {
         let pData = docSnap.data() as UserProfile;
         
         if (pData.isDisabled) {
-          alert("This node has been disabled by the network administrator.");
+          alert("This account has been disabled by the system administrator.");
           signOut(auth);
           return;
         }
@@ -339,7 +369,7 @@ const App: React.FC = () => {
         tx.update(userRef, { isPremium: true });
 
         if (profile.referredBy && !(profile as any).hasClaimedPremiumReferral) {
-          const refQuery = query(collection(db, "profiles"), where("referralCode", "==", profile.referredBy));
+          const refQuery = query(collection(db, "profiles"), where("referralCode", "==", profile.referralCode));
           const refSnap = await getDocs(refQuery);
           if (!refSnap.empty) {
             const referrerUid = refSnap.docs[0].id;
@@ -351,7 +381,7 @@ const App: React.FC = () => {
       });
       setProfile(prev => prev ? { ...prev, isPremium: true } : null);
       setShowPremium(false);
-      alert("Welcome to Pro Node!");
+      alert("Welcome to Pro Access!");
     } catch (e) {
       console.error(e);
       alert("Upgrade failed to process.");
@@ -364,7 +394,20 @@ const App: React.FC = () => {
       const updated = { ...profile, ...data };
       await setDoc(doc(db, "profiles", user.uid), updated, { merge: true });
       setProfile(updated as UserProfile);
+      setView('settings');
     } catch (e) { console.error(e); }
+  };
+
+  const handleDeleteScan = async (scanId: string) => {
+    if (!user) return;
+    if (confirm("Permanently delete this meal record?")) {
+      try {
+        await deleteDoc(doc(db, "profiles", user.uid, "scans", scanId));
+        setScans(prev => prev.filter(s => s.id !== scanId));
+        setView('home');
+        setAnalysis(null);
+      } catch (e) { alert("Failed to delete record."); }
+    }
   };
 
   const getWeekDays = () => {
@@ -396,7 +439,7 @@ const App: React.FC = () => {
     return currentDayFilteredScans.reduce((acc, s) => acc + (s.calories || 0), 0);
   }, [currentDayFilteredScans]);
 
-  const processImage = async (base64: string) => {
+  const processImage = async (base64: string, clarification?: string) => {
     if (!user || !profile) return;
     if (!profile.isPremium && (profile.scansUsedToday || 0) >= MAX_FREE_SCANS_PER_DAY) {
       setShowPremium(true);
@@ -404,9 +447,18 @@ const App: React.FC = () => {
     }
     setIsAnalyzing(true);
     setView('analysis');
+    setClarificationQuestion(null);
     try {
       const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
-      const result = await analyzeFoodImage(base64Data, profile);
+      const result = await analyzeFoodImage(base64Data, profile, clarification);
+      
+      if (result.needsClarification) {
+        setClarificationQuestion(result.clarificationQuestion);
+        setPendingImage(base64);
+        setIsAnalyzing(false);
+        return;
+      }
+
       const scanItem: Omit<ScanHistoryItem, 'id'> = {
         ...result,
         imageUrl: base64,
@@ -461,7 +513,6 @@ const App: React.FC = () => {
         tx.update(sRef, { points: increment(-coins) });
         tx.update(rRef, { points: increment(coins) });
         
-        // Log Transfer
         const logRef = doc(collection(db, "transfers"));
         tx.set(logRef, {
           fromUid: user.uid,
@@ -473,8 +524,8 @@ const App: React.FC = () => {
         });
       });
       setProfile(prev => prev ? { ...prev, points: (prev.points || 0) - coins } : null);
-      alert(`Sent ${coins} coins!`);
-    } catch (e) { alert("Transfer failed."); }
+      alert(`Transfer Approved: ${coins} coins secured.`);
+    } catch (e) { alert("Network error. Transfer aborted."); }
   };
 
   const handleGenerateRoutine = async () => {
@@ -484,32 +535,9 @@ const App: React.FC = () => {
     try {
       const routine = await generateWorkoutRoutine(selectedLocation, selectedMuscleGroups, profile);
       setCurrentRoutine(routine);
-    } catch (err: any) { alert("Failed."); setView('workout_focus'); }
+    } catch (err: any) { alert("Analysis timed out."); setView('workout_focus'); }
     finally { setIsGeneratingRoutine(false); }
   };
-
-  const adminStats = useMemo(() => {
-    const uCount = allUsers.length;
-    const pCount = allUsers.filter(u => u.isPremium).length;
-    const tCoins = allUsers.reduce((acc, u) => acc + (u.points || 0), 0);
-    const aStreak = uCount ? Math.round(allUsers.reduce((acc, u) => acc + (u.currentStreak || 0), 0) / uCount) : 0;
-    return {
-      users: uCount,
-      revenue: pCount * 49,
-      coins: tCoins,
-      streak: aStreak,
-      pending: allWithdrawals.filter(w => w.status === 'pending').length,
-      p2pCount: allTransfers.length
-    };
-  }, [allUsers, allWithdrawals, allTransfers]);
-
-  const filteredAdminUsers = useMemo(() => {
-    return allUsers.filter(u => 
-      (u.name || '').toLowerCase().includes(adminSearch.toLowerCase()) ||
-      (u.email || '').toLowerCase().includes(adminSearch.toLowerCase()) ||
-      (u.uniqueTransferCode || '').toLowerCase().includes(adminSearch.toLowerCase())
-    );
-  }, [allUsers, adminSearch]);
 
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><Loader2 className="animate-spin text-black/20" size={48}/></div>;
   if (!isAdmin && !user) return <Auth onAdminLogin={(status) => { setIsAdmin(status); if(status) { localStorage.setItem('drfoodie_admin', 'true'); setView('admin_dashboard'); } }} />;
@@ -524,301 +552,114 @@ const App: React.FC = () => {
 
       <div className="flex-1 overflow-hidden h-full">
         {isAdmin ? (
-          <div className="animate-fade-in px-4 pb-40 overflow-y-auto h-full no-scrollbar pt-6">
-            {view === 'admin_dashboard' && (
-              <div className="space-y-8">
-                <div className="flex justify-between items-center px-2">
-                   <h1 className="text-4xl font-black tracking-tighter">Terminal</h1>
-                   <div className="bg-green-500 w-3 h-3 rounded-full animate-pulse shadow-green-500 shadow-lg"/>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-100 flex flex-col items-center text-center">
-                    <Users size={24} className="text-blue-500 mb-2"/>
-                    <div className="text-3xl font-black">{adminStats.users}</div>
-                    <div className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Total Users</div>
-                  </div>
-                  <div className="bg-black text-white p-6 rounded-[32px] shadow-card flex flex-col items-center text-center">
-                    <DollarSign size={24} className="text-yellow-400 mb-2"/>
-                    <div className="text-3xl font-black">₹{adminStats.revenue}</div>
-                    <div className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Revenue (PRO)</div>
-                  </div>
-                  <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-100 flex flex-col items-center text-center">
-                    <History size={24} className="text-orange-500 mb-2"/>
-                    <div className="text-3xl font-black">{adminStats.p2pCount}</div>
-                    <div className="text-[10px] font-black uppercase text-gray-400 tracking-widest">P2P Transfers</div>
-                  </div>
-                  <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-100 flex flex-col items-center text-center">
-                    <Clock size={24} className="text-purple-500 mb-2"/>
-                    <div className="text-3xl font-black">{adminStats.pending}</div>
-                    <div className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Pending Payouts</div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-10 rounded-[56px] shadow-card border border-gray-100 flex items-center justify-between">
-                   <div className="flex-1">
-                      <div className="text-5xl font-black tracking-tighter">{formatCoins(adminStats.coins)}</div>
-                      <div className="text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] mt-3">COINS IN CIRCULATION</div>
-                   </div>
-                   <Coins className="text-black opacity-5" size={80} />
-                </div>
-
-                <button onClick={() => setView('admin_transfers')} className="w-full bg-white p-8 rounded-[40px] shadow-card border border-gray-100 flex items-center justify-between group active:scale-[0.98] transition-all">
-                  <div className="flex items-center gap-6">
-                    <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
-                      <ArrowRight size={24}/>
-                    </div>
-                    <div className="text-left">
-                      <div className="font-black text-xl">Audit Ledger</div>
-                      <div className="text-[10px] font-bold text-gray-400 uppercase">View P2P Network Activity</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={20} className="text-gray-200"/>
-                </button>
-              </div>
-            )}
-            {view === 'admin_users' && (
-              <div className="space-y-6">
-                <h1 className="text-3xl font-black">Directory</h1>
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18}/>
-                  <input type="text" placeholder="Search..." value={adminSearch} onChange={e => setAdminSearch(e.target.value)} className="w-full pl-12 pr-4 py-4 rounded-3xl bg-white border-none shadow-card font-bold outline-none focus:ring-2 focus:ring-black" />
-                </div>
-                <div className="space-y-3">
-                  {filteredAdminUsers.map(u => (
-                    <div key={u.uid} onClick={() => { setSelectedAdminUser(u); setView('admin_user_detail'); }} className="bg-white p-5 rounded-[32px] flex items-center justify-between shadow-card border border-gray-50 active:scale-95 transition-all">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center font-black text-gray-400">{u.name?.charAt(0) || '?'}</div>
-                        <div>
-                          <div className="font-black leading-tight flex items-center gap-2">
-                            {u.name || 'Anonymous'}
-                            {u.isDisabled && <Ban size={10} className="text-red-500" />}
-                          </div>
-                          <div className="text-[10px] text-gray-400 font-bold uppercase">{formatCoins(u.points || 0)}c • {u.isPremium ? 'PRO' : 'Free'}</div>
-                        </div>
-                      </div>
-                      <ChevronRight size={18} className="text-gray-200"/>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {view === 'admin_user_detail' && selectedAdminUser && (
-              <div className="space-y-8 animate-fade-in pb-40">
-                 <div className="flex items-center gap-4">
-                   <button onClick={() => setView('admin_users')} className="p-4 bg-white rounded-3xl shadow-card active:scale-95 transition-all"><ArrowLeft size={20}/></button>
-                   <h1 className="text-2xl font-black">Control Panel</h1>
-                 </div>
-                 <div className="bg-white p-8 rounded-[48px] shadow-card border border-gray-100 space-y-8">
-                    <div className="flex items-center gap-6 pb-6 border-b border-gray-50">
-                       <div className="w-20 h-20 bg-black text-white rounded-[24px] flex items-center justify-center font-black text-4xl shadow-xl">{selectedAdminUser.name?.charAt(0)}</div>
-                       <div>
-                          <div className="text-2xl font-black truncate max-w-[200px]">{selectedAdminUser.name || 'Anonymous'}</div>
-                          <div className="text-[10px] font-black uppercase text-gray-400">{selectedAdminUser.email}</div>
-                       </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                       <div className="bg-gray-50 p-6 rounded-[32px] border border-gray-100/50">
-                          <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Coins</div>
-                          <input type="number" defaultValue={selectedAdminUser.points || 0} onBlur={async (e) => {
-                             await updateDoc(doc(db, "profiles", selectedAdminUser.uid), { points: parseInt(e.target.value) || 0 });
-                             alert("Balance updated");
-                          }} className="bg-transparent border-none text-xl font-black w-full outline-none" />
-                       </div>
-                       <button onClick={async () => {
-                          const ns = !selectedAdminUser.isPremium;
-                          await updateDoc(doc(db, "profiles", selectedAdminUser.uid), { isPremium: ns });
-                          setSelectedAdminUser({...selectedAdminUser, isPremium: ns});
-                          alert(`Premium Status: ${ns ? 'ACTIVE' : 'INACTIVE'}`);
-                       }} className={`p-6 rounded-[32px] text-left transition-all border border-transparent ${selectedAdminUser.isPremium ? 'bg-black text-yellow-400 shadow-xl' : 'bg-gray-50 text-gray-400'}`}>
-                          <div className="text-[9px] font-black uppercase tracking-widest mb-1">Status</div>
-                          <div className="text-xl font-black">{selectedAdminUser.isPremium ? 'PRO' : 'Standard'}</div>
-                       </button>
-                    </div>
-
-                    <div className="space-y-3">
-                       <h3 className="text-[10px] font-black uppercase text-gray-300 tracking-widest px-2">Network Management</h3>
-                       <button onClick={async () => {
-                          if (selectedAdminUser.email) {
-                            await sendPasswordResetEmail(auth, selectedAdminUser.email);
-                            alert("Reset link dispatched to " + selectedAdminUser.email);
-                          } else {
-                            alert("User email not found.");
-                          }
-                       }} className="w-full p-6 rounded-[32px] bg-blue-50 text-blue-600 font-black flex items-center justify-between">
-                         <div className="flex items-center gap-4"><Mail size={18}/> Reset Password Link</div>
-                         <ChevronRight size={18}/>
-                       </button>
-
-                       <button onClick={async () => {
-                          const next = !selectedAdminUser.isDisabled;
-                          await updateDoc(doc(db, "profiles", selectedAdminUser.uid), { isDisabled: next });
-                          setSelectedAdminUser({...selectedAdminUser, isDisabled: next});
-                          alert(`Node ${next ? 'Disabled' : 'Enabled'}`);
-                       }} className={`w-full p-6 rounded-[32px] font-black flex items-center justify-between ${selectedAdminUser.isDisabled ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}`}>
-                         <div className="flex items-center gap-4">
-                           {selectedAdminUser.isDisabled ? <CheckCircle2 size={18}/> : <Ban size={18}/>}
-                           {selectedAdminUser.isDisabled ? 'Re-enable Node' : 'Disable Node Access'}
-                         </div>
-                         <ChevronRight size={18}/>
-                       </button>
-
-                       <button onClick={async () => {
-                          if (confirm("PURGE DATA: This will permanently delete this user's profile and scan history. Auth node must be manually removed in Firebase console. Proceed?")) {
-                            await deleteDoc(doc(db, "profiles", selectedAdminUser.uid));
-                            alert("Firestore Profile Purged.");
-                            setView('admin_users');
-                          }
-                       }} className="w-full p-6 rounded-[32px] bg-red-50 text-red-600 font-black flex items-center justify-between">
-                         <div className="flex items-center gap-4"><UserX size={18}/> Purge Account Data</div>
-                         <ChevronRight size={18}/>
-                       </button>
-                    </div>
-                 </div>
-              </div>
-            )}
-            {view === 'admin_transfers' && (
-              <div className="space-y-6 animate-fade-in pb-40">
-                <div className="flex items-center gap-4">
-                  <button onClick={() => setView('admin_dashboard')} className="p-4 bg-white rounded-3xl shadow-card active:scale-95 transition-all"><ArrowLeft size={20}/></button>
-                  <h1 className="text-3xl font-black">Network Ledger</h1>
-                </div>
-                <div className="space-y-4">
-                  {allTransfers.length === 0 ? (
-                    <div className="text-center py-40 opacity-20 flex flex-col items-center gap-4">
-                       <History size={48}/>
-                       <div className="font-black uppercase text-[10px] tracking-widest">No transfers logged</div>
-                    </div>
-                  ) : allTransfers.map(t => (
-                    <div key={t.id} className="bg-white p-6 rounded-[32px] shadow-card border border-gray-50 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400">
-                          <Send size={16}/>
-                        </div>
-                        <div>
-                          <div className="font-black text-sm">{t.fromName} → {t.toName}</div>
-                          <div className="text-[9px] text-gray-300 font-bold uppercase">{new Date(t.timestamp?.toDate()).toLocaleString()}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-black">{t.amount}c</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {view === 'admin_payments' && (
-              <div className="space-y-6 animate-fade-in pb-40">
-                <h1 className="text-3xl font-black">Payments</h1>
-                <div className="space-y-4">
-                  {allWithdrawals.length === 0 ? (
-                    <div className="text-center py-40 opacity-20 flex flex-col items-center gap-4">
-                       <History size={48}/>
-                       <div className="font-black uppercase text-[10px] tracking-widest">No payout requests</div>
-                    </div>
-                  ) : allWithdrawals.map(w => (
-                    <div key={w.id} className="bg-white p-8 rounded-[48px] shadow-card border border-gray-100 space-y-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                           <div className="font-black text-xl">{w.userName}</div>
-                           <div className="text-[10px] text-gray-400 font-bold">{w.upiId}</div>
-                        </div>
-                        <div className="text-right">
-                           <div className="text-3xl font-black">₹{w.coins/100}</div>
-                           <div className={`text-[9px] font-black uppercase tracking-widest mt-1 ${w.status==='pending'?'text-orange-500':'text-green-500'}`}>{w.status}</div>
-                        </div>
-                      </div>
-                      {w.status === 'pending' && <div className="flex gap-2">
-                        <button onClick={async () => { await updateDoc(doc(db, "withdrawals", w.id), { status: 'approved' }); alert("Approved"); }} className="flex-1 bg-black text-white py-4 rounded-[24px] font-black text-[10px] uppercase shadow-lg shadow-black/10">Approve</button>
-                        <button onClick={async () => { await updateDoc(doc(db, "withdrawals", w.id), { status: 'declined' }); await updateDoc(doc(db, "profiles", w.uid), { points: increment(w.totalDeducted) }); alert("Declined"); }} className="flex-1 bg-red-50 text-red-500 py-4 rounded-[24px] font-black text-[10px] uppercase border border-red-100">Decline</button>
-                      </div>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {view === 'settings' && <div className="px-4 pt-10"><button onClick={() => { setIsAdmin(false); localStorage.removeItem('drfoodie_admin'); setView('home'); }} className="w-full p-8 text-red-500 bg-white rounded-[40px] shadow-card flex items-center justify-center gap-3 font-black active:scale-95 transition-all">Logout Admin</button></div>}
-          </div>
+          <AdminPanel 
+            view={view} 
+            setView={setView} 
+            allUsers={allUsers} 
+            allWithdrawals={allWithdrawals} 
+            allTransfers={allTransfers} 
+            adminSearch={adminSearch} 
+            setAdminSearch={setAdminSearch}
+            selectedAdminUser={selectedAdminUser}
+            setSelectedAdminUser={setSelectedAdminUser}
+            setIsAdmin={setIsAdmin}
+          />
         ) : (
-          <div className="animate-fade-in px-4 h-full overflow-hidden">
+          <div className="animate-fade-in px-0 h-full overflow-hidden">
             {view === 'home' && (
-              <div className="pt-6 h-full overflow-y-auto no-scrollbar pb-40">
+              <div className="pt-6 h-full overflow-y-auto no-scrollbar pb-40 px-6">
                 <header className="flex justify-between items-center mb-8">
-                  <div className="flex items-center gap-2"><div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center shadow-lg"><Sparkles size={16} className="text-white fill-white"/></div><h1 className="text-xl font-bold tracking-tight">Dr Foodie</h1></div>
-                  <div className="flex gap-2">
-                    <div className="bg-white px-3 py-2 rounded-full flex items-center gap-1 shadow-sm border border-gray-100">
-                      <Flame size={12} className="text-orange-500 fill-orange-500"/>
-                      <span className="text-[10px] font-black">{profile?.currentStreak || 0}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center shadow-lg">
+                      <Lightning size={20} className="text-white fill-white"/>
                     </div>
-                    <button onClick={()=>setShowPremium(true)} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase shadow-sm ${profile?.isPremium ? 'bg-black text-yellow-400' : 'bg-white text-black'}`}>
-                      {profile?.isPremium ? 'PRO' : `${MAX_FREE_SCANS_PER_DAY - (profile?.scansUsedToday || 0)} Scans`}
+                    <h1 className="text-2xl font-black tracking-tighter">Dr Foodie</h1>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="bg-white px-4 py-2 rounded-full flex items-center gap-2 shadow-sm border border-gray-100">
+                      <Flame size={14} className="text-orange-500 fill-orange-500"/>
+                      <span className="text-xs font-black">{profile?.currentStreak || 0}</span>
+                    </div>
+                    <button onClick={()=>setShowPremium(true)} className={`px-5 py-2 rounded-full text-[10px] font-black uppercase shadow-sm tracking-widest ${profile?.isPremium ? 'bg-black text-yellow-400 border border-yellow-400/20' : 'bg-white text-black'}`}>
+                      {profile?.isPremium ? 'PRO ACCESS' : `${MAX_FREE_SCANS_PER_DAY - (profile?.scansUsedToday || 0)} Scans`}
                     </button>
                   </div>
                 </header>
                 <div className="flex justify-between mb-8 overflow-x-auto no-scrollbar py-2">
                   {getWeekDays().map((d, i) => (
-                    <button key={i} onClick={() => setSelectedDate(d.toDateString())} className={`flex flex-col items-center min-w-[56px] py-4 rounded-[28px] transition-all duration-300 ${d.toDateString() === selectedDate ? 'bg-black text-white shadow-2xl scale-110' : 'bg-white text-gray-400'}`}>
-                      <span className="text-[10px] font-black uppercase mb-1">{d.toLocaleDateString('en-US',{weekday:'short'}).charAt(0)}</span><span className="text-sm font-bold">{d.getDate()}</span>
+                    <button key={i} onClick={() => setSelectedDate(d.toDateString())} className={`flex flex-col items-center min-w-[58px] py-5 rounded-[28px] transition-all duration-300 ${d.toDateString() === selectedDate ? 'bg-black text-white shadow-2xl scale-110' : 'bg-white text-gray-300'}`}>
+                      <span className="text-[10px] font-black uppercase mb-1">{d.toLocaleDateString('en-US',{weekday:'short'}).charAt(0)}</span>
+                      <span className="text-lg font-black">{d.getDate()}</span>
                     </button>
                   ))}
                 </div>
                 <div className="bg-white p-10 rounded-[56px] shadow-card mb-8 flex items-center justify-between border border-gray-100">
                   <div className="flex-1">
                     <div className="flex items-baseline gap-1"><span className="text-7xl font-black tracking-tighter leading-none">{currentTotalCalories}</span><span className="text-xl text-gray-300 font-bold">/{currentCalTarget}</span></div>
-                    <div className="text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] mt-3">DAILY ENERGY BUDGET</div>
+                    <div className="text-[10px] text-gray-400 font-black uppercase tracking-[0.3em] mt-4">DAILY ENERGY BUDGET</div>
                   </div>
-                  <Activity className="text-black opacity-10" size={100} />
+                  <Activity className="text-black opacity-5" size={100} />
                 </div>
                 <div className="space-y-4">
                   {currentDayFilteredScans.length === 0 ? (
                     <div className="text-center py-24 text-gray-300 bg-white rounded-[56px] border-2 border-dashed border-gray-100 flex flex-col items-center gap-4 cursor-pointer hover:bg-gray-50 transition-all active:scale-[0.98]" onClick={startCamera}>
-                      <Camera size={48} className="opacity-10"/><p className="text-sm font-bold uppercase tracking-widest opacity-40">Scan to Start</p>
+                      <Camera size={48} className="opacity-10"/><p className="text-xs font-black uppercase tracking-[0.2em] opacity-40">Start New Scan</p>
                     </div>
                   ) : currentDayFilteredScans.map(s => (
-                    <div key={s.id} onClick={()=>{setAnalysis(s); setView('analysis')}} className="bg-white p-4 rounded-[40px] flex gap-5 shadow-card items-center border border-gray-100 active:scale-98 transition-all hover:bg-gray-50/50">
-                      <img src={s.imageUrl} className="w-16 h-16 rounded-2xl object-cover" />
-                      <div className="flex-1"><div className="font-black text-base truncate max-w-[150px]">{s.foodName}</div><div className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-2">{s.calories} kcal • {s.protein}g P</div></div>
+                    <div key={s.id} onClick={()=>{setAnalysis(s); setView('analysis')}} className="bg-white p-5 rounded-[40px] flex gap-5 shadow-card items-center border border-gray-50 active:scale-95 transition-all hover:bg-gray-50/50">
+                      <img src={s.imageUrl} className="w-16 h-16 rounded-2xl object-cover shadow-sm" />
+                      <div className="flex-1">
+                        <div className="font-black text-base tracking-tight truncate max-w-[150px]">{s.foodName}</div>
+                        <div className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-2">{s.calories} kcal • {s.protein}g P</div>
+                      </div>
                       <ChevronRight size={18} className="text-gray-200"/>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-            {view === 'stats' && <StatsView scans={scans} currentCalTarget={currentCalTarget} profile={profile} />}
+            {view === 'stats' && <StatsView scans={scans} currentCalTarget={currentCalTarget} profile={profile} onBack={() => setView('home')} />}
             {view === 'settings' && (
-               <div className="pt-8 space-y-8 h-full overflow-y-auto no-scrollbar pb-40">
-                  <h1 className="text-4xl font-black tracking-tighter">Settings</h1>
-                  <div className="bg-white p-6 rounded-[56px] shadow-card border border-gray-100 space-y-3">
-                    <div className="flex items-center gap-6 p-10 bg-gray-50 rounded-[48px] mb-8"><div className="w-16 h-16 bg-black text-white rounded-[24px] flex items-center justify-center font-black text-3xl shadow-xl">{profile?.name?.charAt(0)}</div><div><div className="font-black text-2xl truncate max-w-[150px]">{profile?.name}</div><div className="text-[10px] font-black uppercase text-gray-400">Node Established</div></div></div>
-                    <button onClick={()=>setView('wallet')} className="w-full p-6 text-left font-black flex justify-between items-center hover:bg-gray-50 rounded-[32px] transition-all"><span className="flex items-center gap-5"><Gem size={22} className="text-yellow-500"/> My Vault ({formatCoins(profile?.points || 0)})</span><ChevronRight size={18} className="text-gray-200"/></button>
-                    <button onClick={()=>setView('refer')} className="w-full p-6 text-left font-black flex justify-between items-center hover:bg-gray-50 rounded-[32px] transition-all"><span className="flex items-center gap-5"><Gift size={22} className="text-gray-400"/> Network Referral</span><ChevronRight size={18} className="text-gray-200"/></button>
-                    <button onClick={()=>saveProfile({isOnboarded: false})} className="w-full p-6 text-left font-black flex justify-between items-center hover:bg-gray-50 rounded-[32px] transition-all"><span className="flex items-center gap-5"><UserIcon size={22} className="text-gray-400"/> Update Profile</span><ChevronRight size={18} className="text-gray-200"/></button>
-                    <button onClick={()=>setShowPremium(true)} className="w-full p-6 text-left font-black flex justify-between items-center bg-black text-white rounded-[32px] transition-all shadow-xl"><span className="flex items-center gap-5"><Crown size={22} className="text-yellow-400 fill-yellow-400"/> Dr Foodie Pro</span><ChevronRight size={18} className="opacity-40"/></button>
-                    <button onClick={()=>setView('team')} className="w-full p-6 text-left font-black flex justify-between items-center hover:bg-gray-50 rounded-[32px] transition-all"><span className="flex items-center gap-5"><Users size={22} className="text-gray-400"/> The Team</span><ChevronRight size={18} className="text-gray-200"/></button>
-                    <button onClick={()=>signOut(auth)} className="w-full p-6 text-left font-black text-red-500 hover:bg-red-50 rounded-[32px] flex items-center gap-5 transition-all"><LogOut size={22}/> Logout Terminal</button>
-                  </div>
-               </div>
+              <SettingsSection 
+                profile={profile} 
+                onViewWallet={() => setView('wallet')} 
+                onViewRefer={() => setView('refer')} 
+                onUpdateProfile={() => setView('update_profile')}
+                onShowPremium={() => setShowPremium(true)}
+                onViewTeam={() => setView('team')}
+                onLogout={() => signOut(auth)}
+                onBack={() => setView('home')}
+              />
             )}
+            {view === 'update_profile' && <Onboarding onComplete={saveProfile} initialData={profile} onBack={() => setView('settings')} />}
             {view === 'team' && <TeamSection onBack={() => setView('settings')} />}
             {view === 'wallet' && <WalletForm profile={profile} onTransfer={handleTransferCoins} onBack={() => setView('settings')} />}
             {view === 'refer' && <ReferralView profile={profile} onBack={() => setView('settings')} />}
-            {view === 'workout_location' && <WorkoutLocationView onSelect={(loc) => { setSelectedLocation(loc); setView('workout_focus'); }} />}
+            {view === 'workout_location' && <WorkoutLocationView onBack={() => setView('home')} onSelect={(loc) => { setSelectedLocation(loc); setView('workout_focus'); }} />}
             {view === 'workout_focus' && <WorkoutFocusView location={selectedLocation!} selectedGroups={selectedMuscleGroups} onToggle={(g)=>setSelectedMuscleGroups(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev, g])} onGenerate={handleGenerateRoutine} onBack={() => setView('workout_location')} />}
             {view === 'workout_plan' && <WorkoutPlanView routine={currentRoutine} isGenerating={isGeneratingRoutine} onBack={() => setView('workout_focus')} />}
-            {view === 'analysis' && <AnalysisDetailView analysis={analysis} isAnalyzing={isAnalyzing} onBack={() => setView('home')} />}
+            {view === 'analysis' && <AnalysisDetailView analysis={analysis} isAnalyzing={isAnalyzing} onBack={() => setView('home')} onDelete={() => analysis && handleDeleteScan(analysis.id)} />}
           </div>
         )}
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-gray-100 p-5 pb-12 flex justify-between items-center z-40 max-w-md mx-auto px-10 shadow-floating">
-        <button onClick={()=>{setView(isAdmin ? 'admin_dashboard' : 'home')}} className={`transition-all duration-300 ${(view==='home' || view==='admin_dashboard')?'text-black scale-125':'text-black/30'}`}><Home size={26}/></button>
-        <button onClick={()=>{ if (isAdmin) setView('admin_payments'); else setView('workout_location'); }} className={`transition-all duration-300 ${(view.startsWith('workout') || view === 'admin_payments')?'text-black scale-125':'text-black/30'}`}>{isAdmin ? <DollarSign size={26}/> : <Dumbbell size={26}/>}</button>
-        <div className="relative -mt-20 flex justify-center z-50">
-          <button onClick={()=>{ if (isAdmin) setView('admin_users'); else startCamera(); }} className="w-24 h-24 bg-black rounded-full flex items-center justify-center text-white border-[10px] border-[#F2F2F7] shadow-2xl active:scale-90 transition-all hover:shadow-black/20">{isAdmin ? <Users size={36}/> : <Plus size={48}/>}</button>
+      {clarificationQuestion && (
+        <ClarificationModal 
+          question={clarificationQuestion} 
+          onAnswer={(ans) => processImage(pendingImage!, ans)} 
+          onApprox={() => processImage(pendingImage!, "Use approximate values for everything.")}
+          onCancel={() => { setClarificationQuestion(null); setPendingImage(null); setView('home'); }}
+        />
+      )}
+
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-gray-100 p-5 pb-10 flex justify-between items-center z-40 max-w-md mx-auto px-10 shadow-floating">
+        <button onClick={()=>{setView(isAdmin ? 'admin_dashboard' : 'home')}} className={`transition-all duration-300 ${(view==='home' || view==='admin_dashboard')?'text-black scale-110':'text-black/20'}`}><Home size={26}/></button>
+        <button onClick={()=>{ if (isAdmin) setView('admin_payments'); else setView('workout_location'); }} className={`transition-all duration-300 ${(view.startsWith('workout') || view === 'admin_payments')?'text-black scale-110':'text-black/20'}`}>{isAdmin ? <DollarSign size={26}/> : <Dumbbell size={26}/>}</button>
+        <div className="relative -mt-16 flex justify-center z-50">
+          <button onClick={()=>{ if (isAdmin) setView('admin_users'); else startCamera(); }} className="w-20 h-20 bg-black rounded-full flex items-center justify-center text-white border-[8px] border-[#F2F2F7] shadow-2xl active:scale-90 transition-all hover:shadow-black/20">{isAdmin ? <Users size={32}/> : <Plus size={40}/>}</button>
         </div>
-        <button onClick={()=>{ if (!isAdmin) setView('stats'); }} disabled={isAdmin} className={`transition-all duration-300 ${(!isAdmin && view==='stats')?'text-black scale-125':'text-black/30'}`}>{!isAdmin && <BarChart2 size={26}/>}</button>
-        <button onClick={()=>setView('settings')} className={`transition-all duration-300 ${view==='settings' || view === 'team' || view === 'wallet' || view === 'refer' ?'text-black scale-125':'text-black/30'}`}><Settings size={26}/></button>
+        <button onClick={()=>{ if (!isAdmin) setView('stats'); }} disabled={isAdmin} className={`transition-all duration-300 ${(!isAdmin && view==='stats')?'text-black scale-110':'text-black/20'}`}>{!isAdmin && <BarChart2 size={26}/>}</button>
+        <button onClick={()=>setView('settings')} className={`transition-all duration-300 ${view==='settings' || view === 'team' || view === 'wallet' || view === 'refer' || view === 'update_profile' ?'text-black scale-110':'text-black/20'}`}><Settings size={26}/></button>
       </nav>
 
       <PremiumModal isOpen={showPremium} onClose={()=>setShowPremium(false)} onUpgrade={handleUpgradeToPremium} />
@@ -826,10 +667,10 @@ const App: React.FC = () => {
       {view === 'camera' && (
           <div className="fixed inset-0 z-[100] bg-black animate-fade-in flex flex-col">
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-            <div className="absolute inset-0 flex flex-col justify-between p-12">
+            <div className="absolute inset-0 flex flex-col justify-between p-10">
               <div className="flex justify-between pt-10">
                 <button onClick={() => setView('home')} className="p-5 bg-white/10 backdrop-blur-lg rounded-full text-white active:scale-90 transition-all"><X size={32}/></button>
-                <button onClick={() => fileInputRef.current?.click()} className="p-5 bg-white/10 backdrop-blur-lg rounded-full text-white active:scale-90 transition-all"><ImageIcon size={32}/></button>
+                <button onClick={() => fileInputRef.current?.click()} className="p-5 bg-white/10 backdrop-blur-lg rounded-full text-white active:scale-90 transition-all"><Image size={32}/></button>
               </div>
               <div className="flex justify-center pb-20">
                 <button onClick={captureImage} className="w-28 h-28 bg-white rounded-full border-[10px] border-white/20 flex items-center justify-center active:scale-90 transition-all shadow-2xl"><div className="w-20 h-20 bg-black rounded-full flex items-center justify-center text-white"><ScanLine size={36}/></div></button>
@@ -839,17 +680,17 @@ const App: React.FC = () => {
       )}
 
       <style>{`
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         ::-webkit-scrollbar { display: none; }
         body { background-color: #F2F2F7; }
         .shadow-floating { box-shadow: 0 32px 64px rgba(0,0,0,0.1); }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
         .luxury-shimmer {
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
           background-size: 200% 100%;
-          animation: shimmer 2s infinite linear;
+          animation: shimmer 3s infinite linear;
         }
         @keyframes shimmer {
           from { background-position: -200% 0; }
@@ -860,9 +701,101 @@ const App: React.FC = () => {
   );
 };
 
+// --- SETTINGS SECTION (Mobile Optimized) ---
+
+const SettingsSection: React.FC<{
+  profile: UserProfile | null;
+  onViewWallet: () => void;
+  onViewRefer: () => void;
+  onUpdateProfile: () => void;
+  onShowPremium: () => void;
+  onViewTeam: () => void;
+  onLogout: () => void;
+  onBack: () => void;
+}> = ({ profile, onViewWallet, onViewRefer, onUpdateProfile, onShowPremium, onViewTeam, onLogout, onBack }) => (
+  <div className="pt-8 space-y-10 h-full overflow-y-auto no-scrollbar pb-40 px-2">
+    <div className="px-4 flex items-center gap-4">
+      <button onClick={onBack} className="p-4 bg-white rounded-3xl shadow-card active:scale-95 transition-all">
+        <ArrowLeft size={20}/>
+      </button>
+      <div className="space-y-0.5">
+        <h1 className="text-4xl font-black tracking-tight text-black">Settings</h1>
+        <p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.3em] ml-1">PROFILE CONFIG</p>
+      </div>
+    </div>
+
+    <div className="bg-white p-8 rounded-[56px] shadow-card border border-gray-100 flex items-center gap-6 mx-4">
+      <div className="w-20 h-20 bg-black text-white rounded-[28px] flex items-center justify-center font-black text-4xl shadow-2xl relative">
+        {profile?.name?.charAt(0)}
+        {profile?.isPremium && (
+          <div className="absolute -top-2 -right-2 w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center border-4 border-white">
+            <Crown size={12} className="text-black fill-black" />
+          </div>
+        )}
+      </div>
+      <div>
+        <div className="text-2xl font-black tracking-tight text-black truncate max-w-[180px]">{profile?.name}</div>
+        <div className="text-[9px] font-black uppercase text-gray-400 tracking-widest mt-1">
+          {profile?.isPremium ? 'Pro Account' : 'Basic Account'}
+        </div>
+      </div>
+    </div>
+
+    <div className="space-y-4 px-2">
+      <div className="bg-white rounded-[48px] shadow-card border border-gray-100 overflow-hidden">
+        <div className="p-4 px-8 pt-8 text-[10px] font-black text-gray-300 uppercase tracking-widest">ASSETS & REWARDS</div>
+        <div className="divide-y divide-gray-50">
+          <SettingItem icon={<Gem size={20} className="text-yellow-500"/>} title="My Vault" value={formatCoins(profile?.points || 0)} onClick={onViewWallet} />
+          <SettingItem icon={<Gift size={20} className="text-blue-500"/>} title="Refer & Earn" onClick={onViewRefer} />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-[48px] shadow-card border border-gray-100 overflow-hidden">
+        <div className="p-4 px-8 pt-8 text-[10px] font-black text-gray-300 uppercase tracking-widest">CONFIGURATION</div>
+        <div className="divide-y divide-gray-50">
+          <SettingItem icon={<UserIcon size={20} className="text-purple-500"/>} title="Update Profile" onClick={onUpdateProfile} />
+          <SettingItem icon={<Crown size={20} className="text-yellow-400"/>} title="Upgrade to Pro" highlight onClick={onShowPremium} />
+          <SettingItem icon={<Users size={20} className="text-orange-500"/>} title="The Team" onClick={onViewTeam} />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-[48px] shadow-card border border-gray-100 overflow-hidden">
+        <div className="p-4 px-8 pt-8 text-[10px] font-black text-gray-300 uppercase tracking-widest">SUPPORT</div>
+        <div className="divide-y divide-gray-50">
+          <SettingItem icon={<Shield size={20} className="text-green-500"/>} title="Privacy & Security" />
+          <SettingItem icon={<HelpCircle size={20} className="text-gray-400"/>} title="Help Center" />
+        </div>
+      </div>
+
+      <button onClick={onLogout} className="w-full p-8 text-red-500 bg-white rounded-[48px] shadow-card flex items-center justify-center gap-3 font-black active:scale-95 transition-all border border-red-50 mt-4">
+        <LogOut size={22}/> Logout Terminal
+      </button>
+
+      <div className="text-center py-6">
+        <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.4em]">Dr Foodie Build v2.1.0-Release</p>
+      </div>
+    </div>
+  </div>
+);
+
+const SettingItem: React.FC<{ icon: React.ReactNode; title: string; value?: string; onClick?: () => void; highlight?: boolean }> = ({ icon, title, value, onClick, highlight }) => (
+  <button onClick={onClick} className={`w-full p-6 px-8 flex items-center justify-between transition-all active:bg-gray-50 ${highlight ? 'bg-black/5' : ''}`}>
+    <div className="flex items-center gap-5">
+      <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center">
+        {icon}
+      </div>
+      <div className="text-left">
+        <div className={`font-black text-base tracking-tight ${highlight ? 'text-black' : 'text-gray-700'}`}>{title}</div>
+        {value && <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{value}</div>}
+      </div>
+    </div>
+    <ChevronRight size={18} className="text-gray-200"/>
+  </button>
+);
+
 // --- SUB-COMPONENTS ---
 
-const StatsView: React.FC<{ scans: ScanHistoryItem[]; currentCalTarget: number; profile: UserProfile | null }> = ({ scans, currentCalTarget, profile }) => {
+const StatsView: React.FC<{ scans: ScanHistoryItem[]; currentCalTarget: number; profile: UserProfile | null; onBack: () => void }> = ({ scans, currentCalTarget, profile, onBack }) => {
   const last7Days = useMemo(() => {
     const days = [];
     for (let i = 6; i >= 0; i--) {
@@ -876,58 +809,104 @@ const StatsView: React.FC<{ scans: ScanHistoryItem[]; currentCalTarget: number; 
     return days;
   }, [scans]);
 
-  const streak = profile?.currentStreak || 0;
+  const bmiData = useMemo(() => {
+    if (!profile || !profile.weight || !profile.height) return null;
+    const heightInMeters = profile.height / 100;
+    const bmi = profile.weight / (heightInMeters * heightInMeters);
+    let category = "Normal";
+    let color = "text-green-500";
+    if (bmi < 18.5) { category = "Underweight"; color = "text-blue-500"; }
+    else if (bmi >= 25 && bmi < 30) { category = "Overweight"; color = "text-orange-500"; }
+    else if (bmi >= 30) { category = "Obese"; color = "text-red-500"; }
+    return { bmi: bmi.toFixed(1), category, color };
+  }, [profile]);
 
   return (
-    <div className="pt-8 space-y-8 animate-fade-in pb-40 px-4 overflow-y-auto h-full no-scrollbar">
-      <h1 className="text-4xl font-black tracking-tighter">Growth Matrix</h1>
-      
-      <div className="bg-white p-8 rounded-[48px] shadow-card border border-gray-100 space-y-6">
-         <div className="flex justify-between items-center">
+    <div className="pt-8 space-y-8 animate-fade-in pb-40 px-2 overflow-y-auto h-full no-scrollbar">
+      <div className="flex items-center gap-4 px-4">
+        <button onClick={onBack} className="p-4 bg-white rounded-3xl shadow-card active:scale-95 transition-all">
+          <ArrowLeft size={20}/>
+        </button>
+        <h1 className="text-4xl font-black tracking-tighter">Growth Matrix</h1>
+      </div>
+
+      {bmiData && (
+        <div className="bg-white p-10 rounded-[56px] shadow-card border border-gray-100 mx-2 flex items-center justify-between overflow-hidden relative group">
+           <div className="absolute top-0 left-0 w-2 h-full bg-black group-hover:w-4 transition-all duration-500" />
+           <div className="space-y-1 relative z-10">
+              <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Your BMI Status</div>
+              <div className="text-6xl font-black tracking-tighter">{bmiData.bmi}</div>
+              <div className={`text-[11px] font-black uppercase tracking-[0.2em] ${bmiData.color} px-1`}>{bmiData.category} Profile</div>
+           </div>
+           <Activity className="text-black opacity-5 group-hover:scale-110 transition-transform duration-500" size={100} />
+        </div>
+      )}
+
+      <div className="bg-white p-8 rounded-[56px] shadow-card border border-gray-100 space-y-8 mx-2 overflow-hidden relative">
+         <div className="flex justify-between items-center relative z-10">
             <h3 className="text-[11px] font-black uppercase text-gray-400 tracking-[0.2em] flex items-center gap-2 px-1">
-               <Trophy size={14} className="text-orange-400"/> Streak Rewards
+              <Trophy size={14} className="text-yellow-500"/> Milestone Rewards
             </h3>
-            <div className="bg-orange-50 text-orange-500 px-3 py-1 rounded-full text-[10px] font-black uppercase">{streak} Days</div>
+            <div className="bg-black text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl">
+              {profile?.currentStreak || 0} DAY STREAK
+            </div>
          </div>
          
-         <div className="space-y-3">
+         <div className="space-y-4 relative z-10">
             {[
-               { days: 30, amount: '200', reached: streak >= 30 },
-               { days: 60, amount: '500', reached: streak >= 60 },
-               { days: 90, amount: '999', reached: streak >= 90 },
-            ].map((m, i) => (
-               <div key={i} className={`p-5 rounded-[28px] flex items-center justify-between border transition-all ${m.reached ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-100/50 opacity-60'}`}>
-                  <div className="flex items-center gap-4">
-                     <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${m.reached ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
-                        {m.reached ? <Check size={20} /> : <BadgeCheck size={20}/>}
-                     </div>
-                     <div>
-                        <div className="font-black text-sm">{m.days} Days Streak</div>
-                        <div className="text-[10px] font-bold text-gray-400">Earn Future Rewards</div>
-                     </div>
-                  </div>
-                  <div className={`text-[10px] font-black uppercase tracking-widest ${m.reached ? 'text-green-600' : 'text-gray-300'}`}>
-                     {m.reached ? 'Secured' : `${Math.round((streak/m.days)*100)}%`}
-                  </div>
-               </div>
-            ))}
+               { days: 30, amount: '200', reached: (profile?.currentStreak || 0) >= 30, color: "bg-blue-600" },
+               { days: 60, amount: '500', reached: (profile?.currentStreak || 0) >= 60, color: "bg-purple-600" },
+               { days: 90, amount: '999', reached: (profile?.currentStreak || 0) >= 90, color: "bg-yellow-500" },
+            ].map((m, i) => {
+               const progress = Math.min(100, ((profile?.currentStreak || 0) / m.days) * 100);
+               return (
+                 <div key={i} className={`p-6 rounded-[36px] flex items-center justify-between border-2 transition-all relative overflow-hidden group ${m.reached ? 'border-transparent shadow-2xl bg-black text-white' : 'border-gray-50 bg-gray-50/50'}`}>
+                    {!m.reached && (
+                      <div 
+                        className={`absolute left-0 top-0 bottom-0 ${m.color} opacity-10 transition-all duration-1000 ease-out`} 
+                        style={{ width: `${progress}%` }} 
+                      />
+                    )}
+                    <div className="flex items-center gap-5 relative z-10">
+                       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center backdrop-blur-md ${m.reached ? 'bg-white/20 text-white shadow-lg' : 'bg-white text-gray-300 shadow-sm'}`}>
+                          {m.reached ? <CheckCircle2 size={24} strokeWidth={3} /> : <Lock size={20}/>}
+                       </div>
+                       <div>
+                          <div className={`font-black text-lg tracking-tight`}>{m.days} Days</div>
+                          <div className={`text-[10px] font-bold uppercase tracking-widest ${m.reached ? 'text-white/60' : 'text-gray-400'}`}>Reward Credit</div>
+                       </div>
+                    </div>
+                    <div className="text-right relative z-10">
+                      <div className={`text-2xl font-black ${m.reached ? 'text-white' : 'text-gray-600'}`}>₹{m.amount}</div>
+                      {!m.reached && (
+                        <div className="w-24 h-1.5 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner">
+                          <div className={`h-full ${m.color}`} style={{ width: `${progress}%` }} />
+                        </div>
+                      )}
+                      <div className={`text-[9px] font-black uppercase tracking-widest mt-1 ${m.reached ? 'text-white/70' : 'text-gray-300'}`}>
+                        {m.reached ? 'CLAIMED' : `${Math.round(progress)}% COMPLETE`}
+                      </div>
+                    </div>
+                 </div>
+               );
+            })}
          </div>
       </div>
 
-      <div className="bg-white p-10 rounded-[56px] shadow-card border border-gray-100">
+      <div className="bg-white p-10 rounded-[56px] shadow-card border border-gray-100 mx-2">
         <div className="flex items-center gap-3 mb-8">
           <TrendingUp size={20} className="text-black"/>
-          <h3 className="text-[11px] font-black uppercase text-gray-400 tracking-[0.3em]">Metabolic Momentum</h3>
+          <h3 className="text-[11px] font-black uppercase text-gray-400 tracking-[0.3em]">Energy Trend</h3>
         </div>
-        <div className="flex items-end justify-between h-48 gap-2">
+        <div className="flex items-end justify-between h-48 gap-3">
           {last7Days.map((d, i) => {
-            const h = Math.min(100, (d.total / (currentCalTarget * 1.5)) * 100);
+            const h = Math.min(100, (d.total / (currentCalTarget * 1.2)) * 100);
             return (
-              <div key={i} className="flex-1 flex flex-col items-center gap-3 h-full group">
+              <div key={i} className="flex-1 flex flex-col items-center gap-4 h-full">
                 <div className="w-full bg-gray-50 rounded-2xl relative flex-1 flex items-end overflow-hidden">
-                  <div className={`w-full transition-all duration-700 rounded-t-lg ${d.total > currentCalTarget ? 'bg-red-400' : 'bg-black'}`} style={{ height: `${Math.max(5, h)}%` }} />
+                  <div className={`w-full transition-all duration-700 rounded-t-xl ${d.total > currentCalTarget ? 'bg-red-400' : 'bg-black'}`} style={{ height: `${Math.max(5, h)}%` }} />
                 </div>
-                <span className="text-[10px] font-black text-gray-400 uppercase">{d.date}</span>
+                <span className="text-[10px] font-black text-gray-300 uppercase">{d.date.charAt(0)}</span>
               </div>
             );
           })}
@@ -940,98 +919,84 @@ const StatsView: React.FC<{ scans: ScanHistoryItem[]; currentCalTarget: number; 
 const ReferralView: React.FC<{ profile: UserProfile | null; onBack: () => void }> = ({ profile, onBack }) => {
   const shareCode = async () => {
     if (!profile) return;
-    const msg = `Establish your node on Dr Foodie using code: ${profile.referralCode}. Every coin we earn now is a real-money asset at the Airdrop Launch! 🚀`;
-    if (navigator.share) {
-      await navigator.share({ title: 'Establish Your Node', text: msg, url: window.location.href });
-    } else {
-      await navigator.clipboard.writeText(msg);
-      alert("Referral link secured!");
-    }
+    const msg = `Start your health journey on Dr Foodie using code: ${profile.referralCode}. Earn real rewards for your fitness consistency! 🚀`;
+    if (navigator.share) { await navigator.share({ title: 'Join Dr Foodie', text: msg, url: window.location.href }); }
+    else { await navigator.clipboard.writeText(msg); alert("Link copied!"); }
   };
-
   return (
-    <div className="pt-4 space-y-8 animate-fade-in pb-40 px-4 h-full overflow-y-auto no-scrollbar">
+    <div className="pt-4 space-y-8 animate-fade-in pb-40 px-6 h-full overflow-y-auto no-scrollbar">
       <div className="flex items-center gap-4">
-        <button onClick={onBack} className="p-4 bg-white rounded-3xl shadow-card active:scale-95 transition-all">
-          <ArrowLeft size={20}/>
-        </button>
-        <h1 className="text-3xl font-black">Network Build</h1>
+        <button onClick={onBack} className="p-4 bg-white rounded-3xl shadow-card active:scale-95 transition-all"><ArrowLeft size={20}/></button>
+        <h1 className="text-3xl font-black tracking-tight">Referral Network</h1>
       </div>
-      
       <div className="bg-black text-white p-12 rounded-[56px] text-center relative overflow-hidden shadow-2xl border border-white/5">
          <div className="absolute top-0 left-0 w-full h-full opacity-30 luxury-shimmer pointer-events-none" />
-         <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6 backdrop-blur-md">
-            <Gift size={40} className="text-yellow-400" />
-         </div>
-         <h2 className="text-3xl font-black mb-2">Build your Node</h2>
-         <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.2em] px-8">The Airdrop is coming. Every referral increases your multiplier.</p>
+         <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6 backdrop-blur-md"><Gift size={40} className="text-yellow-400" /></div>
+         <h2 className="text-3xl font-black mb-2 tracking-tighter">Expand Circle</h2>
+         <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.2em] px-4">Both get 100 coins instantly. Rewards reveal at Phase 2 conversion.</p>
          <div className="mt-10 bg-white/5 p-6 rounded-[32px] border border-white/10 group cursor-pointer active:scale-95 transition-all" onClick={shareCode}>
-            <div className="text-[10px] font-black uppercase text-gray-500 tracking-[0.3em] mb-2">YOUR ACCESS CODE</div>
-            <div className="text-4xl font-black tracking-widest text-white flex items-center justify-center gap-3">
-              {profile?.referralCode} <Share size={20} className="text-white/20"/>
-            </div>
-         </div>
-      </div>
-
-      <div className="bg-white p-10 rounded-[48px] shadow-card border border-gray-100 space-y-8">
-         <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Network Rewards</h3>
-         <div className="space-y-6">
-            <div className="flex gap-6 items-start">
-               <div className="w-10 h-10 bg-gray-50 rounded-2xl flex items-center justify-center font-black text-black shadow-sm">100</div>
-               <div><p className="font-black text-base">Signup Asset</p><p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Both receive 100 coins. These are pre-launch assets for the coming conversion.</p></div>
-            </div>
-            <div className="flex gap-6 items-start">
-               <div className="w-10 h-10 bg-yellow-400 rounded-2xl flex items-center justify-center font-black text-black shadow-lg">250</div>
-               <div><p className="font-black text-base">Pro Multiplier</p><p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Earn 250 extra coins when they go Pro. Secure the maximum share before Phase 2.</p></div>
-            </div>
+            <div className="text-[10px] font-black uppercase text-gray-500 tracking-[0.3em] mb-2">YOUR UNIQUE CODE</div>
+            <div className="text-4xl font-black tracking-widest text-white flex items-center justify-center gap-3">{profile?.referralCode} <Share size={20} className="text-white/20"/></div>
          </div>
       </div>
     </div>
   );
 };
 
-const WorkoutLocationView: React.FC<{ onSelect: (loc: WorkoutLocation) => void }> = ({ onSelect }) => (
-  <div className="pt-10 space-y-12 animate-fade-in px-6">
-    <div className="space-y-2"><h1 className="text-4xl font-black tracking-tight">Location</h1><p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em]">PICK YOUR TRAINING ZONE</p></div>
-    <div className="space-y-6">
-      <button onClick={() => onSelect(WorkoutLocation.GYM)} className="w-full bg-white p-8 rounded-[48px] shadow-card border border-gray-100 flex items-center gap-8 group active:scale-[0.98] transition-all text-left">
-        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-black group-hover:bg-black group-hover:text-white transition-colors"><Dumbbell size={32} /></div>
-        <div><h3 className="text-2xl font-black">Public Gym</h3><p className="text-sm font-bold text-gray-300">Equipment-rich facility</p></div>
+const WorkoutLocationView: React.FC<{ onBack: () => void; onSelect: (loc: WorkoutLocation) => void }> = ({ onBack, onSelect }) => (
+  <div className="pt-10 space-y-12 animate-fade-in px-8">
+    <div className="flex items-center gap-4">
+      <button onClick={onBack} className="p-4 bg-white rounded-3xl shadow-card active:scale-95 transition-all">
+        <ArrowLeft size={20}/>
       </button>
-      <button onClick={() => onSelect(WorkoutLocation.HOME)} className="w-full bg-white p-8 rounded-[48px] shadow-card border border-gray-100 flex items-center gap-8 group active:scale-[0.98] transition-all text-left">
-        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-black group-hover:bg-black group-hover:text-white transition-colors"><Home size={32} /></div>
-        <div><h3 className="text-2xl font-black">Home/Park</h3><p className="text-sm font-bold text-gray-300">No equipment needed</p></div>
+      <div className="space-y-1">
+        <h1 className="text-4xl font-black tracking-tight text-black">Training Zone</h1>
+        <p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.3em]">SELECT ENVIRONMENT</p>
+      </div>
+    </div>
+    <div className="space-y-6">
+      <button onClick={() => onSelect(WorkoutLocation.GYM)} className="w-full bg-white p-10 rounded-[56px] shadow-card border border-gray-100 flex items-center gap-8 active:scale-95 transition-all text-left">
+        <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center text-black shadow-inner"><Dumbbell size={32} /></div>
+        <div><h3 className="text-2xl font-black tracking-tight">Fitness Center</h3><p className="text-sm font-bold text-gray-300">Advanced equipment usage</p></div>
+      </button>
+      <button onClick={() => onSelect(WorkoutLocation.HOME)} className="w-full bg-white p-10 rounded-[56px] shadow-card border border-gray-100 flex items-center gap-8 active:scale-95 transition-all text-left">
+        <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center text-black shadow-inner"><Home size={32} /></div>
+        <div><h3 className="text-2xl font-black tracking-tight">Home Space</h3><p className="text-sm font-bold text-gray-300">Basic/No equipment focus</p></div>
       </button>
     </div>
   </div>
 );
 
 const WorkoutFocusView: React.FC<{ location: WorkoutLocation; selectedGroups: MuscleGroup[]; onToggle: (g: MuscleGroup) => void; onGenerate: () => void; onBack: () => void; }> = ({ location, selectedGroups, onToggle, onGenerate, onBack }) => (
-  <div className="pt-6 space-y-8 animate-fade-in px-6 pb-64 h-full overflow-y-auto no-scrollbar">
-    <div className="flex items-center justify-between"><button onClick={onBack} className="flex items-center gap-1 text-[10px] font-black uppercase text-gray-400 tracking-widest"><ArrowLeft size={14}/> BACK</button><div className="bg-black text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">{location}</div></div>
-    <h1 className="text-5xl font-black tracking-tighter">Focus</h1>
+  <div className="pt-6 space-y-8 animate-fade-in px-8 pb-64 h-full overflow-y-auto no-scrollbar">
+    <div className="flex items-center justify-between"><button onClick={onBack} className="p-4 bg-white rounded-3xl shadow-card"><ArrowLeft size={20}/></button><div className="bg-black text-white px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest">{location}</div></div>
+    <h1 className="text-5xl font-black tracking-tighter text-black px-2">Focus</h1>
     <div className="space-y-3">
       {Object.values(MuscleGroup).map((group) => (
-        <button key={group} onClick={() => onToggle(group)} className={`w-full p-7 rounded-[32px] flex items-center justify-between transition-all border ${selectedGroups.includes(group) ? 'bg-black text-white border-black scale-[1.02] shadow-xl' : 'bg-white text-black border-gray-50 shadow-card'}`}>
-          <span className="text-xl font-black">{group}</span><Plus size={20} className={selectedGroups.includes(group) ? 'rotate-45' : ''} />
+        <button key={group} onClick={() => onToggle(group)} className={`w-full p-8 rounded-[40px] flex items-center justify-between transition-all border ${selectedGroups.includes(group) ? 'bg-black text-white border-black scale-[1.02] shadow-2xl' : 'bg-white text-black border-gray-50 shadow-card'}`}>
+          <span className="text-xl font-black tracking-tight">{group}</span>
+          {selectedGroups.includes(group) ? <CheckCircle2 size={24} className="text-yellow-400"/> : <Plus size={24} className="text-gray-200" />}
         </button>
       ))}
     </div>
-    <button onClick={onGenerate} disabled={selectedGroups.length === 0} className="fixed bottom-32 left-8 right-8 bg-black text-white py-6 rounded-[32px] font-black text-xl shadow-2xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30 transition-all z-10">Generate Routine <ChevronRight size={24}/></button>
+    <button onClick={onGenerate} disabled={selectedGroups.length === 0} className="fixed bottom-32 left-10 right-10 bg-black text-white py-6 rounded-[32px] font-black text-xl shadow-2xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30 transition-all z-10 border border-white/10">Build Routine <ChevronRight size={24}/></button>
   </div>
 );
 
 const WorkoutPlanView: React.FC<{ routine: Exercise[]; isGenerating: boolean; onBack: () => void }> = ({ routine, isGenerating, onBack }) => {
-  if (isGenerating) return <div className="flex flex-col items-center justify-center h-[75vh] animate-pulse px-8"><div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-xl mb-8 border border-gray-100"><Loader2 className="animate-spin text-black" size={40}/></div><h3 className="text-3xl font-black tracking-tight mb-2 text-center">Optimizing...</h3></div>;
+  if (isGenerating) return <div className="flex flex-col items-center justify-center h-[75vh] animate-pulse px-10"><div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-2xl mb-10 border border-gray-100"><Loader2 className="animate-spin text-black" size={40}/></div><h3 className="text-3xl font-black tracking-tighter text-center">Optimizing Plan...</h3></div>;
   return (
-    <div className="pt-6 space-y-8 animate-fade-in px-6 pb-40 overflow-y-auto h-full no-scrollbar">
-      <div className="flex items-center justify-between"><button onClick={onBack} className="flex items-center gap-1 text-[10px] font-black uppercase text-gray-400 tracking-widest"><ArrowLeft size={14}/> BACK</button></div>
-      <h1 className="text-5xl font-black tracking-tighter">Your Plan</h1>
+    <div className="pt-6 space-y-8 animate-fade-in px-8 pb-40 overflow-y-auto h-full no-scrollbar">
+      <div className="flex items-center justify-between"><button onClick={onBack} className="p-4 bg-white rounded-3xl shadow-card"><ArrowLeft size={20}/></button></div>
+      <h1 className="text-5xl font-black tracking-tighter text-black">Training Plan</h1>
       <div className="space-y-4">
         {routine.map((ex, idx) => (
-          <div key={idx} className="bg-white p-5 rounded-[40px] shadow-card border border-gray-100 flex gap-6 items-center">
-            <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center border border-gray-100"><Dumbbell size={24} className="text-gray-200" /></div>
-            <div className="flex-1 space-y-1"><div className="flex justify-between items-start"><h4 className="text-lg font-black leading-tight pr-2">{ex.name}</h4><div className="bg-orange-50 text-orange-600 px-2 py-1 rounded-lg text-[10px] font-black whitespace-nowrap">{ex.sets}x{ex.reps}</div></div><p className="text-[10px] font-bold text-gray-300 leading-tight uppercase line-clamp-2">{ex.description}</p></div>
+          <div key={idx} className="bg-white p-6 rounded-[48px] shadow-card border border-gray-100 flex gap-6 items-center">
+            <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center flex-shrink-0"><Dumbbell size={24} className="text-gray-200" /></div>
+            <div className="flex-1 min-w-0">
+               <div className="flex justify-between items-start mb-1"><h4 className="text-lg font-black leading-tight truncate pr-2">{ex.name}</h4><div className="bg-black text-white px-2 py-0.5 rounded-lg text-[9px] font-black whitespace-nowrap">{ex.sets}x{ex.reps}</div></div>
+               <p className="text-[10px] font-bold text-gray-300 leading-tight uppercase line-clamp-2">{ex.description}</p>
+            </div>
           </div>
         ))}
       </div>
@@ -1039,71 +1004,87 @@ const WorkoutPlanView: React.FC<{ routine: Exercise[]; isGenerating: boolean; on
   );
 };
 
-const AnalysisDetailView: React.FC<{ analysis: ScanHistoryItem | null; isAnalyzing: boolean; onBack: () => void }> = ({ analysis, isAnalyzing, onBack }) => (
-  <div className="pt-6 h-full overflow-y-auto no-scrollbar pb-40 px-4">
-    <div className="flex items-center gap-4 mb-6"><button onClick={onBack} className="p-4 bg-white rounded-3xl shadow-card active:scale-95 transition-all"><ArrowLeft size={20}/></button><h1 className="text-2xl font-black">Analysis</h1></div>
-    {isAnalyzing ? <div className="flex flex-col items-center justify-center py-20 space-y-4"><Loader2 className="animate-spin text-black" size={48} /><p className="font-bold text-gray-400 uppercase tracking-widest text-xs">Processing...</p></div> : analysis ? (
-      <div className="space-y-8">
-        <div className="bg-white rounded-[48px] overflow-hidden shadow-card border border-gray-50 animate-fade-in">
-          <img src={analysis.imageUrl} className="w-full h-64 object-cover" />
-          <div className="p-8 space-y-8">
-            <div className="flex justify-between items-start">
-               <div>
-                  <h2 className="text-3xl font-black tracking-tighter leading-none">{analysis.foodName}</h2>
-                  <div className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-3 flex items-center gap-2">
-                    <Clock size={12}/> {analysis.mealType}
+const AnalysisDetailView: React.FC<{ analysis: ScanHistoryItem | null; isAnalyzing: boolean; onBack: () => void; onDelete: () => void }> = ({ analysis, isAnalyzing, onBack, onDelete }) => (
+  <div className="pt-0 h-full overflow-y-auto no-scrollbar pb-40 bg-white">
+    {isAnalyzing ? (
+      <div className="flex flex-col items-center justify-center py-40 space-y-4 px-6">
+        <Loader2 className="animate-spin text-black" size={48} />
+        <p className="font-black text-gray-400 uppercase tracking-widest text-[10px]">Processing Data...</p>
+      </div>
+    ) : analysis ? (
+      <div className="animate-fade-in">
+        <div className="relative">
+          <img src={analysis.imageUrl} className="w-full h-[50vh] object-cover shadow-2xl" />
+          <div className="absolute top-6 left-6 right-6 flex justify-between items-center">
+            <button 
+              onClick={onBack} 
+              className="p-4 bg-white/20 backdrop-blur-xl rounded-2xl text-white active:scale-95 transition-all border border-white/30 shadow-lg"
+            >
+              <ArrowLeft size={24}/>
+            </button>
+            <button 
+              onClick={onDelete} 
+              className="p-4 bg-red-500/20 backdrop-blur-xl rounded-2xl text-white active:scale-95 transition-all border border-red-500/30 shadow-lg"
+            >
+              <Trash2 size={24}/>
+            </button>
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent" />
+        </div>
+        
+        <div className="px-8 -mt-16 relative z-10 space-y-10 pb-10">
+          <div className="flex justify-between items-end">
+            <div className="min-w-0">
+              <h2 className="text-5xl font-black tracking-tighter leading-[0.9] text-black break-words">{analysis.foodName}</h2>
+              <div className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-6 flex items-center gap-2">
+                <Clock size={12}/> {analysis.mealType} LOG
+              </div>
+            </div>
+            <div className="bg-black text-white px-7 py-5 rounded-[32px] text-center shadow-2xl flex-shrink-0 mb-2">
+              <div className="text-3xl font-black leading-none">{analysis.healthScore}</div>
+              <div className="text-[9px] font-black uppercase opacity-40 mt-1">SCORE</div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="text-[11px] font-black uppercase text-gray-400 tracking-[0.4em] px-1">Micro Stats</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-[#F2F2F7] p-8 rounded-[40px] flex flex-col justify-between h-32">
+                <span className="text-[10px] font-black text-gray-400 uppercase">Kcal</span>
+                <span className="text-4xl font-black text-black">{analysis.calories}</span>
+              </div>
+              <div className="bg-red-50 p-8 rounded-[40px] flex flex-col justify-between h-32 border border-red-100/50">
+                <span className="text-[10px] font-black text-red-300 uppercase">Protein</span>
+                <span className="text-4xl font-black text-red-500">{analysis.protein}g</span>
+              </div>
+              <div className="bg-orange-50 p-8 rounded-[40px] flex flex-col justify-between h-32 border border-orange-100/50">
+                <span className="text-[10px] font-black text-orange-300 uppercase">Carbs</span>
+                <span className="text-4xl font-black text-orange-500">{analysis.carbs}g</span>
+              </div>
+              <div className="bg-blue-50 p-8 rounded-[40px] flex flex-col justify-between h-32 border border-blue-100/50">
+                <span className="text-[10px] font-black text-blue-300 uppercase">Fats</span>
+                <span className="text-4xl font-black text-blue-500">{analysis.fat}g</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="text-[11px] font-black uppercase text-gray-400 tracking-[0.4em] px-1">Healthy Swaps</h3>
+            <div className="space-y-4">
+              {analysis.alternatives?.map((alt, idx) => (
+                <div key={idx} className="bg-white p-7 rounded-[36px] border border-gray-100 flex items-center gap-6 shadow-sm active:scale-98 transition-all">
+                  <div className="w-14 h-14 bg-black text-white rounded-2xl flex items-center justify-center shadow-xl flex-shrink-0">
+                    <Sparkle size={24} className="fill-white"/>
                   </div>
-               </div>
-               <div className="bg-black text-white px-5 py-3 rounded-[24px] text-center shadow-lg">
-                  <div className="text-xl font-black leading-none">{analysis.healthScore}</div>
-                  <div className="text-[8px] font-black uppercase opacity-40">Score</div>
-               </div>
+                  <p className="font-bold text-lg tracking-tight text-gray-800 leading-tight">{alt}</p>
+                </div>
+              ))}
             </div>
+          </div>
 
-            {/* Macros Section */}
-            <div className="space-y-4">
-               <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] px-1">Metabolic Synergy</h3>
-               <div className="grid grid-cols-4 gap-2">
-                 <div className="bg-gray-50 p-4 rounded-3xl text-center border border-gray-100/50">
-                    <div className="text-lg font-black">{analysis.calories}</div>
-                    <div className="text-[8px] font-black text-gray-300 uppercase">Kcal</div>
-                 </div>
-                 <div className="bg-red-50 p-4 rounded-3xl text-center border border-red-100/50">
-                    <div className="text-lg font-black text-red-500">{analysis.protein}g</div>
-                    <div className="text-[8px] font-black text-red-300 uppercase">Prot</div>
-                 </div>
-                 <div className="bg-orange-50 p-4 rounded-3xl text-center border border-orange-100/50">
-                    <div className="text-lg font-black text-orange-500">{analysis.carbs}g</div>
-                    <div className="text-[8px] font-black text-orange-300 uppercase">Carb</div>
-                 </div>
-                 <div className="bg-blue-50 p-4 rounded-3xl text-center border border-blue-100/50">
-                    <div className="text-lg font-black text-blue-500">{analysis.fat}g</div>
-                    <div className="text-[8px] font-black text-blue-300 uppercase">Fat</div>
-                 </div>
-               </div>
-            </div>
-
-            {/* Alternatives Section */}
-            <div className="space-y-4">
-               <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] px-1">Healthy Swaps</h3>
-               <div className="space-y-2">
-                  {analysis.alternatives?.map((alt, idx) => (
-                    <div key={idx} className="bg-white p-5 rounded-[32px] border border-gray-100 flex items-center gap-4 shadow-sm group">
-                       <div className="w-10 h-10 bg-black text-white rounded-2xl flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
-                          <Sparkle size={18} className="fill-white"/>
-                       </div>
-                       <p className="font-bold text-sm tracking-tight">{alt}</p>
-                    </div>
-                  ))}
-               </div>
-            </div>
-
-            <div className="bg-gray-900 text-white p-6 rounded-[32px] relative overflow-hidden">
-               <Activity size={60} className="absolute -right-4 -bottom-4 opacity-5" />
-               <p className="text-[11px] font-bold leading-relaxed relative z-10 italic text-gray-400">
-                  <span className="text-white">Note:</span> {analysis.microAnalysis}
-               </p>
-            </div>
+          <div className="bg-gray-900 text-white p-10 rounded-[48px] relative overflow-hidden">
+            <Activity size={120} className="absolute -right-8 -bottom-8 opacity-5" />
+            <p className="text-base font-bold leading-relaxed relative z-10 italic text-gray-300">"{analysis.microAnalysis}"</p>
           </div>
         </div>
       </div>
@@ -1112,52 +1093,178 @@ const AnalysisDetailView: React.FC<{ analysis: ScanHistoryItem | null; isAnalyzi
 );
 
 const TeamSection: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const founder = TEAM_MEMBERS[0];
-  const others = TEAM_MEMBERS.slice(1);
-
   return (
-    <div className="pt-6 h-full overflow-y-auto no-scrollbar pb-40 px-4">
-      <div className="flex items-center gap-4 mb-8">
-        <button onClick={onBack} className="p-4 bg-white rounded-3xl shadow-card active:scale-95 transition-all">
-          <ArrowLeft size={20}/>
-        </button>
-        <h1 className="text-4xl font-black tracking-tight">The Team</h1>
+    <div className="pt-6 h-full overflow-y-auto no-scrollbar pb-40 px-6">
+      <div className="flex items-center gap-4 mb-10">
+        <button onClick={onBack} className="p-4 bg-white rounded-3xl shadow-card active:scale-95 transition-all"><ArrowLeft size={20}/></button>
+        <h1 className="text-4xl font-black tracking-tight text-black">Core Team</h1>
       </div>
-
       <div className="space-y-8">
-        {/* Founder Card */}
-        <div className="bg-black rounded-[48px] p-10 relative overflow-hidden shadow-2xl min-h-[180px] flex flex-col justify-end">
-          <div className="absolute top-6 right-6 opacity-20 transform rotate-12">
-             <Crown size={90} className="text-white" />
+        <div className="bg-black rounded-[56px] p-12 relative overflow-hidden shadow-2xl min-h-[220px] flex flex-col justify-end group">
+          <div className="absolute top-8 right-8 opacity-20 transform group-hover:rotate-12 transition-transform duration-700">
+             <Crown size={120} className="text-white" />
           </div>
           <div className="relative z-10">
-            <div className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-4">Founder</div>
-            <h2 className="text-4xl font-black text-white tracking-tighter leading-tight">{founder.name}</h2>
+            <div className="text-[10px] font-black text-gray-500 uppercase tracking-[0.5em] mb-4">SYSTEM ARCHITECT</div>
+            <h2 className="text-4xl font-black text-white tracking-tighter leading-tight">Charan Ravanam</h2>
+            <p className="text-[10px] text-gray-500 font-bold uppercase mt-2 tracking-widest">FOUNDER & CEO</p>
           </div>
         </div>
 
-        {/* Core Members List */}
-        <div className="bg-white rounded-[56px] p-10 shadow-card border border-gray-100">
-          <div className="flex items-center gap-3 mb-8 px-2">
-            <Users size={16} className="text-gray-400"/>
-            <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em]">Core Team Members</h3>
+        <div className="bg-white rounded-[56px] p-12 shadow-card border border-gray-100 flex flex-col items-center text-center space-y-6">
+           <div className="w-32 h-32 bg-gray-50 rounded-[48px] flex items-center justify-center font-black text-6xl text-black shadow-inner">K</div>
+           <div>
+              <h3 className="text-3xl font-black tracking-tighter text-black">Kranthi Madireddy</h3>
+              <div className="bg-yellow-400 text-black px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mt-4 inline-block shadow-lg">CORE MEMBER</div>
+           </div>
+           <p className="text-gray-400 text-xs font-bold leading-relaxed max-w-[200px]">Leading engineering and algorithmic metabolic insight at Dr Foodie.</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AdminPanel: React.FC<{ 
+  view: string; 
+  setView: (v: any) => void; 
+  allUsers: any[]; 
+  allWithdrawals: any[]; 
+  allTransfers: any[]; 
+  adminSearch: string; 
+  setAdminSearch: (v: string) => void;
+  selectedAdminUser: any;
+  setSelectedAdminUser: (u: any) => void;
+  setIsAdmin: (s: boolean) => void;
+}> = ({ view, setView, allUsers, allWithdrawals, allTransfers, adminSearch, setAdminSearch, selectedAdminUser, setSelectedAdminUser, setIsAdmin }) => {
+  const stats = useMemo(() => {
+    const pCount = allUsers.filter(u => u.isPremium).length;
+    return {
+      users: allUsers.length,
+      revenue: pCount * 49,
+      coins: allUsers.reduce((acc, u) => acc + (u.points || 0), 0),
+      transfers: allTransfers.length
+    };
+  }, [allUsers, allTransfers]);
+
+  const filteredUsers = allUsers.filter(u => (u.name || '').toLowerCase().includes(adminSearch.toLowerCase()));
+
+  return (
+    <div className="animate-fade-in px-6 pb-40 overflow-y-auto h-full no-scrollbar pt-10">
+      {view === 'admin_dashboard' && (
+        <div className="space-y-8">
+          <div className="flex justify-between items-center">
+             <h1 className="text-4xl font-black tracking-tighter">Terminal</h1>
+             <div className="bg-green-500 w-3 h-3 rounded-full animate-pulse shadow-green-500 shadow-lg"/>
           </div>
-          
-          <div className="space-y-4">
-            {others.map((m, i) => (
-              <div key={i} className="bg-gray-50/50 p-6 rounded-[32px] flex items-center gap-6 border border-gray-50 group hover:bg-gray-100 transition-all">
-                <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center font-black text-xl text-gray-300 shadow-sm border border-gray-100 transition-transform group-hover:scale-105">
-                  {m.name.charAt(0)}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-100 text-center">
+              <Users size={24} className="text-blue-500 mb-2 mx-auto"/>
+              <div className="text-3xl font-black">{stats.users}</div>
+              <div className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Total Users</div>
+            </div>
+            <div className="bg-black text-white p-6 rounded-[32px] shadow-card text-center">
+              <DollarSign size={24} className="text-yellow-400 mb-2 mx-auto"/>
+              <div className="text-3xl font-black">₹{stats.revenue}</div>
+              <div className="text-[9px] font-black uppercase text-gray-500 tracking-widest">Revenue (PRO)</div>
+            </div>
+          </div>
+          <div className="bg-white p-10 rounded-[56px] shadow-card border border-gray-100 flex items-center justify-between">
+             <div className="flex-1">
+                <div className="text-5xl font-black tracking-tighter">{formatCoins(stats.coins)}</div>
+                <div className="text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] mt-3">COINS IN CIRCULATION</div>
+             </div>
+             <Coins className="text-black opacity-5" size={80} />
+          </div>
+          <button onClick={() => setView('admin_transfers')} className="w-full bg-white p-8 rounded-[40px] shadow-card border border-gray-100 flex items-center justify-between group">
+            <div className="flex items-center gap-6">
+              <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center"><ArrowRight size={24}/></div>
+              <div className="text-left"><div className="font-black text-xl">Audit Ledger</div><div className="text-[10px] font-bold text-gray-400 uppercase">View Network Activity</div></div>
+            </div>
+            <ChevronRight size={20} className="text-gray-200"/>
+          </button>
+        </div>
+      )}
+
+      {view === 'admin_users' && (
+        <div className="space-y-6">
+          <h1 className="text-3xl font-black tracking-tight">User Directory</h1>
+          <div className="relative">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300" size={18}/>
+            <input type="text" placeholder="Search profiles..." value={adminSearch} onChange={e => setAdminSearch(e.target.value)} className="w-full pl-14 pr-4 py-5 rounded-[24px] bg-white border-none shadow-card font-bold outline-none focus:ring-2 focus:ring-black" />
+          </div>
+          <div className="space-y-3">
+            {filteredUsers.map(u => (
+              <div key={u.uid} onClick={() => { setSelectedAdminUser(u); setView('admin_user_detail'); }} className="bg-white p-5 rounded-[32px] flex items-center justify-between shadow-card active:scale-95 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center font-black text-gray-400">{u.name?.charAt(0)}</div>
+                  <div>
+                    <div className="font-black leading-tight flex items-center gap-2">{u.name || 'Unknown'}{u.isDisabled && <Ban size={10} className="text-red-500" />}</div>
+                    <div className="text-[10px] text-gray-400 font-bold uppercase">{formatCoins(u.points || 0)}c • {u.isPremium ? 'PRO' : 'Free'}</div>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-xl font-black text-black leading-tight">{m.name}</h4>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">{m.role}</p>
-                </div>
+                <ChevronRight size={18} className="text-gray-200"/>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      )}
+
+      {view === 'admin_transfers' && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setView('admin_dashboard')} className="p-4 bg-white rounded-3xl shadow-card"><ArrowLeft size={20}/></button>
+            <h1 className="text-3xl font-black">Ledger</h1>
+          </div>
+          <div className="space-y-4">
+            {allTransfers.map(t => (
+              <div key={t.id} className="bg-white p-6 rounded-[32px] shadow-card border border-gray-50 flex items-center justify-between">
+                <div>
+                  <div className="font-black text-sm">{t.fromName} → {t.toName}</div>
+                  <div className="text-[9px] text-gray-300 font-bold uppercase">{new Date(t.timestamp?.toDate()).toLocaleString()}</div>
+                </div>
+                <div className="text-lg font-black">{t.amount}c</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {view === 'admin_user_detail' && selectedAdminUser && (
+        <div className="space-y-8 pb-20">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setView('admin_users')} className="p-4 bg-white rounded-3xl shadow-card"><ArrowLeft size={20}/></button>
+            <h1 className="text-2xl font-black">Control Panel</h1>
+          </div>
+          <div className="bg-white p-8 rounded-[48px] shadow-card space-y-8">
+            <div className="flex items-center gap-6 pb-6 border-b border-gray-50">
+               <div className="w-20 h-20 bg-black text-white rounded-[28px] flex items-center justify-center font-black text-4xl">{selectedAdminUser.name?.charAt(0)}</div>
+               <div><div className="text-2xl font-black">{selectedAdminUser.name}</div><div className="text-[10px] font-black uppercase text-gray-400">{selectedAdminUser.email}</div></div>
+            </div>
+            <div className="space-y-3">
+               <button onClick={async () => {
+                  const next = !selectedAdminUser.isDisabled;
+                  await updateDoc(doc(db, "profiles", selectedAdminUser.uid), { isDisabled: next });
+                  setSelectedAdminUser({...selectedAdminUser, isDisabled: next});
+                  alert(`Access Status Updated.`);
+               }} className={`w-full p-6 rounded-[32px] font-black flex items-center justify-between ${selectedAdminUser.isDisabled ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}`}>
+                 <div className="flex items-center gap-4">{selectedAdminUser.isDisabled ? <CheckCircle2 size={18}/> : <Ban size={18}/>} {selectedAdminUser.isDisabled ? 'Re-enable Access' : 'Disable Access'}</div>
+                 <ChevronRight size={18}/>
+               </button>
+               <button onClick={async () => {
+                  if (confirm("Permanently delete profile data?")) {
+                    await deleteDoc(doc(db, "profiles", selectedAdminUser.uid));
+                    setView('admin_users');
+                  }
+               }} className="w-full p-6 rounded-[32px] bg-red-50 text-red-600 font-black flex items-center justify-between">
+                 <div className="flex items-center gap-4"><UserX size={18}/> Purge Data</div>
+                 <ChevronRight size={18}/>
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {view === 'settings' && <div className="pt-10"><button onClick={() => { setIsAdmin(false); localStorage.removeItem('drfoodie_admin'); setView('home'); }} className="w-full p-8 text-red-500 bg-white rounded-[48px] shadow-card font-black active:scale-95 transition-all">Logout Admin</button></div>}
     </div>
   );
 };

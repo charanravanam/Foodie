@@ -74,6 +74,8 @@ export interface FoodAnalysis {
   imageUrl?: string;
   mealType: MealType;
   alternatives: string[];
+  needsClarification?: boolean;
+  clarificationQuestion?: string;
 }
 
 export interface ScanHistoryItem extends FoodAnalysis {
