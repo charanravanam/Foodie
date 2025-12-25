@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { 
   Home, BarChart2, Settings, Plus, Flame, ChevronRight, ArrowLeft, ArrowRight,
@@ -1089,6 +1088,15 @@ const TeamSection: React.FC<{ onBack: () => void }> = ({ onBack }) => {
            </div>
            <p className="text-gray-400 text-[10px] font-bold leading-relaxed max-w-[180px]">Leading engineering and algorithmic metabolic insight.</p>
         </div>
+
+        <div className="bg-white rounded-[40px] p-10 shadow-card border border-gray-100 flex flex-col items-center text-center space-y-4">
+           <div className="w-24 h-24 bg-gray-50 rounded-[32px] flex items-center justify-center font-black text-4xl text-black shadow-inner">G</div>
+           <div>
+              <h3 className="text-2xl font-black tracking-tighter text-black">Gagan Adithya Reddy</h3>
+              <div className="bg-yellow-400 text-black px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest mt-3 inline-block shadow-lg">CORE MEMBER</div>
+           </div>
+           <p className="text-gray-400 text-[10px] font-bold leading-relaxed max-w-[180px]">Strategy lead and ecosystem growth strategist.</p>
+        </div>
       </div>
     </div>
   );
@@ -1224,7 +1232,7 @@ const AdminPanel: React.FC<{
                     await deleteDoc(doc(db, "profiles", selectedAdminUser.uid));
                     setView('admin_users');
                   }
-               }} className="w-full p-5 rounded-[24px] bg-red-50 text-red-600 font-black text-xs flex items-center justify-between">
+               }} className="w-full p-5 rounded-[24px] bg-red-50 text-red-600 font-black text-xs flex items-center justify-center">
                  <div className="flex items-center gap-3"><UserX size={16}/> Purge Data</div>
                  <ChevronRight size={16}/>
                </button>
