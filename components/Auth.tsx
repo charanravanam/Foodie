@@ -19,21 +19,17 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
   const [loading, setLoading] = useState(false);
 
   const validateForm = () => {
-    // Allow 'admin' keyword to pass email validation
-    if (email.toLowerCase() === 'admin') {
-      if (password.length < 1) {
-        setError("Admin credentials required.");
-        return false;
-      }
-      return true;
-    }
-
+    // Basic format check for all inputs
     if (!email.includes('@')) {
-      setError("Please enter a valid email address.");
+      setError("Please enter a valid email address (e.g., name@domain.com).");
       return false;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (password.length < 1) {
+      setError("Password is required.");
+      return false;
+    }
+    if (!isLogin && password.length < 6) {
+      setError("Password must be at least 6 characters for new accounts.");
       return false;
     }
     return true;
@@ -43,8 +39,8 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
     e.preventDefault();
     setError(null);
     setMessage(null);
-    if (!email) {
-      setError("Enter email to receive reset link.");
+    if (!email || !email.includes('@')) {
+      setError("Enter a valid email to receive reset link.");
       return;
     }
     setLoading(true);
@@ -64,8 +60,8 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
 
     setError(null);
     
-    // Admin check bypasses validation for simple dev access
-    if (email.toLowerCase() === 'admin' && password === 'adminfoodie') {
+    // Explicit Admin Credential Check
+    if (email.toLowerCase() === 'admin@foodie' && password === 'adminfoodie') {
       onAdminLogin(true);
       return;
     }
@@ -120,7 +116,7 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
               <input
                 type="text"
-                placeholder="Email or Username"
+                placeholder="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[20px] border-none focus:ring-1 focus:ring-black font-bold transition-all shadow-inner text-sm"
