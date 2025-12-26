@@ -52,7 +52,7 @@ export const generateWorkoutRoutine = async (
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: { parts: [{ text: "Coach, provide the exercise list now." }] },
+      contents: [{ parts: [{ text: "Coach, provide the exercise list now." }] }],
       config: {
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
@@ -107,12 +107,14 @@ export const analyzeFoodImage = async (
     try {
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: {
-          parts: [
-            { text: additionalInfo || "Perform metabolic scan on this meal. Response: JSON only." },
-            { inlineData: { mimeType, data: base64Image } }
-          ],
-        },
+        contents: [
+          {
+            parts: [
+              { text: additionalInfo || "Perform metabolic scan on this meal. Response: JSON only." },
+              { inlineData: { mimeType, data: base64Image } }
+            ],
+          },
+        ],
         config: {
           systemInstruction: systemPrompt,
           responseMimeType: "application/json",
@@ -136,7 +138,7 @@ export const analyzeFoodImage = async (
         },
       });
 
-      const text = response.text;
+      const text = response.text || "";
       return extractJSON(text);
     } catch (error: any) {
       console.warn(`Metabolic node attempt ${attempt + 1} fail:`, error);

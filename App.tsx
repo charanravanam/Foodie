@@ -899,6 +899,8 @@ const App: React.FC = () => {
           await fetchProfile(u); 
         } catch (err) {
           console.error("Profile initialization error:", err);
+          // Fallback if document lookup fails for any reason
+          if (!profile) setProfile({ isOnboarded: false } as UserProfile);
         }
       } 
       else { setUser(null); setProfile(null); }
@@ -933,8 +935,6 @@ const App: React.FC = () => {
     if (referralCode && !profileData.hasClaimedSignupReferral) {
       try {
         const q = query(collection(db, "profiles"), where("referralCode", "==", referralCode.toUpperCase()));
-        // Note: This query may fail if Firestore rules don't permit wide searching of profiles.
-        // We catch the error to ensure login process is not blocked.
         const snap = await getDocs(q);
         
         if (!snap.empty) {
@@ -953,7 +953,7 @@ const App: React.FC = () => {
           }
         }
       } catch (e) {
-        console.warn("Referral code validation failed or permission denied:", e);
+        console.warn("Referral application skipped (permission or network):", e);
       } finally {
         localStorage.removeItem(`pending_referral_${uId}`);
       }
@@ -1019,10 +1019,7 @@ const App: React.FC = () => {
       }
     } catch (e) { 
       console.error("Profile fetch error:", e); 
-      // Ensure local state at least knows we're not onboarded if document is missing/unreachable
-      if (!profile) {
-        setProfile({ isOnboarded: false } as UserProfile);
-      }
+      if (!profile) setProfile({ isOnboarded: false } as UserProfile);
     }
   };
 
@@ -1032,7 +1029,7 @@ const App: React.FC = () => {
       const updated = { ...profile, ...data };
       await setDoc(doc(db, "profiles", user.uid), updated, { merge: true });
       setProfile(updated as UserProfile);
-      setView('home'); // Redirect to home after onboarding or update
+      setView('home'); 
     } catch (err) {
       console.error("Save profile error:", err);
       alert("Failed to sync metabolic metrics.");
@@ -1073,7 +1070,7 @@ const App: React.FC = () => {
     try {
       optimizedBase64 = await resizeImage(base64);
     } catch (e) {
-      console.warn("Resize failed, using source:", e);
+      console.warn("Resize failed, using original source:", e);
     }
     
     const pendingItem: any = {
@@ -1247,7 +1244,7 @@ const App: React.FC = () => {
                      { icon: <Crown size={18}/>, label: 'Go Pro', action: () => setShowPremium(true), hidden: profile?.isPremium },
                      { icon: <Users size={18}/>, label: 'Team Info', action: () => setView('team') },
                    ].filter(i => !i.hidden).map((item, i) => (
-                     <button key={i} onClick={item.action} className="w-full bg-white p-5 rounded-[28px] flex items-center justify-between border border-gray-50 shadow-sm active:scale-95 transition-all">
+                     <button key={i} onClick={item.action} className="w-full bg-white p-5 rounded-[28px] flex items-center justify-between border border-gray-100 shadow-sm active:scale-95 transition-all">
                         <div className="flex items-center gap-4">
                            <div className="text-black/40">{item.icon}</div>
                            <span className="text-sm font-black text-gray-700">{item.label}</span>
