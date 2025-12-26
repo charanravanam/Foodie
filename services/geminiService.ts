@@ -29,6 +29,15 @@ function extractJSON(text: string): any {
         console.error("JSON recovery failed:", e2);
       }
     }
+    // Attempt 3: Try to find an array if object parse failed
+    const arrayMatch = cleanText.match(/\[[\s\S]*\]/);
+    if (arrayMatch) {
+      try {
+        return JSON.parse(arrayMatch[0]);
+      } catch (e3) {
+        console.error("Array recovery failed:", e3);
+      }
+    }
     throw new Error("Metabolic data corruption: Invalid JSON structure.");
   }
 }
@@ -41,18 +50,28 @@ export const generateWorkoutRoutine = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const systemPrompt = `
-    You are an elite fitness coach. Create a workout routine.
-    Location: ${location}
-    Focus: ${muscleGroups.join(', ')}
-    Goal: ${userProfile.goal}
-    Stats: ${userProfile.weight}kg, ${userProfile.age}y.
-    Return a JSON array of exercises.
+    You are an elite clinical fitness coach AI. Your task is to generate a personalized workout routine.
+    
+    Context:
+    - User Goal: ${userProfile.goal}
+    - Location: ${location}
+    - Focus Areas: ${muscleGroups.join(', ')}
+    - User Stats: ${userProfile.weight}kg, ${userProfile.age} years old.
+    
+    Instructions:
+    - Provide 4-6 exercises.
+    - If location is "Home", focus on bodyweight or minimal equipment.
+    - If location is "Gym", include machine and free weight exercises.
+    - Each exercise MUST have a unique ID, clear instructions, and realistic sets/reps for the goal.
+    - imageUrl should be a descriptive placeholder URL or null.
+    - muscleGroups must be a subset of the enum values provided.
+    - Response MUST be a JSON array of Exercise objects.
   `;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: [{ parts: [{ text: "Coach, provide the exercise list now." }] }],
+      contents: [{ parts: [{ text: `Coach, generate my ${location}-based routine focusing on ${muscleGroups.join(' and ')}. Output valid JSON array only.` }] }],
       config: {
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
@@ -61,21 +80,34 @@ export const generateWorkoutRoutine = async (
           items: {
             type: Type.OBJECT,
             properties: {
-              id: { type: Type.STRING },
+              id: { type: Type.STRING, description: "A unique slug for the exercise" },
               name: { type: Type.STRING },
               sets: { type: Type.NUMBER },
               reps: { type: Type.STRING },
               description: { type: Type.STRING },
               imageUrl: { type: Type.STRING },
-              muscleGroups: { type: Type.ARRAY, items: { type: Type.STRING } }
+              location: { type: Type.STRING, enum: Object.values(WorkoutLocation) },
+              muscleGroups: { 
+                type: Type.ARRAY, 
+                items: { type: Type.STRING, enum: Object.values(MuscleGroup) } 
+              }
             },
-            required: ["name", "sets", "reps", "description", "muscleGroups"]
+            required: ["id", "name", "sets", "reps", "description", "location", "muscleGroups"]
           }
         }
       }
     });
 
-    return extractJSON(response.text || "[]");
+    const text = response.text || "[]";
+    const routine = extractJSON(text);
+    
+    // Safety mapping to ensure types are correct
+    return routine.map((ex: any) => ({
+      ...ex,
+      id: ex.id || Math.random().toString(36).substr(2, 9),
+      location: ex.location || location,
+      imageUrl: ex.imageUrl || `https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=200&h=200&fit=crop`
+    }));
   } catch (error: any) {
     console.error("Routine Generation Error:", error);
     throw error;

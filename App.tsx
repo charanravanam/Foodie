@@ -653,8 +653,14 @@ const WorkoutPlanView: React.FC<{ routine: Exercise[]; isGenerating: boolean; on
         <h1 className="text-2xl font-black tracking-tight text-black">Routine</h1>
       </div>
       <div className="space-y-4">
-        {routine.map((ex, i) => (
-          <div key={i} className="bg-white p-6 rounded-[36px] shadow-card border border-gray-100 space-y-4 group">
+        {routine.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-[40px] border border-gray-100 p-8 shadow-card space-y-4">
+            <Activity size={48} className="mx-auto text-gray-200" />
+            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Routine Established</p>
+            <button onClick={onBack} className="bg-black text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">Re-Compute Node</button>
+          </div>
+        ) : routine.map((ex, i) => (
+          <div key={ex.id || i} className="bg-white p-6 rounded-[36px] shadow-card border border-gray-100 space-y-4 group">
             <div className="flex justify-between items-start gap-4">
                <div className="flex-1">
                  <div className="bg-black text-white px-3 py-1 rounded-full text-[8px] font-black tracking-widest inline-block mb-2">STEP 0{i+1}</div>
@@ -899,7 +905,6 @@ const App: React.FC = () => {
           await fetchProfile(u); 
         } catch (err) {
           console.error("Profile initialization error:", err);
-          // Fallback if document lookup fails for any reason
           if (!profile) setProfile({ isOnboarded: false } as UserProfile);
         }
       } 
@@ -1171,6 +1176,22 @@ const App: React.FC = () => {
     }
   };
 
+  const handleGenerateWorkout = async () => {
+    if (!selectedLocation || !profile) return;
+    setIsGeneratingRoutine(true); 
+    setView('workout_plan'); 
+    try { 
+      const r = await generateWorkoutRoutine(selectedLocation, selectedMuscleGroups, profile); 
+      setCurrentRoutine(r); 
+    } catch (e) { 
+      console.error("Workout flow error:", e);
+      alert("Neural training node failed. Try fewer muscle groups.");
+      setView('workout_focus'); 
+    } finally { 
+      setIsGeneratingRoutine(false); 
+    } 
+  };
+
   const currentCalTarget = useMemo(() => {
     if (!profile) return 2000;
     const s = profile.gender === Gender.FEMALE ? -161 : 5;
@@ -1244,7 +1265,7 @@ const App: React.FC = () => {
                      { icon: <Crown size={18}/>, label: 'Go Pro', action: () => setShowPremium(true), hidden: profile?.isPremium },
                      { icon: <Users size={18}/>, label: 'Team Info', action: () => setView('team') },
                    ].filter(i => !i.hidden).map((item, i) => (
-                     <button key={i} onClick={item.action} className="w-full bg-white p-5 rounded-[28px] flex items-center justify-between border border-gray-100 shadow-sm active:scale-95 transition-all">
+                     <button key={i} onClick={item.action} className="w-full bg-white p-5 rounded-[28px] flex items-center justify-between border border-gray-50 shadow-sm active:scale-95 transition-all">
                         <div className="flex items-center gap-4">
                            <div className="text-black/40">{item.icon}</div>
                            <span className="text-sm font-black text-gray-700">{item.label}</span>
@@ -1263,7 +1284,7 @@ const App: React.FC = () => {
             {view === 'wallet' && <WalletForm profile={profile} onTransfer={handleTransfer} onBack={() => setView('settings')} />}
             {view === 'refer' && <ReferralView profile={profile} onBack={() => setView('settings')} />}
             {view === 'workout_location' && <WorkoutLocationView onBack={() => setView('home')} onSelect={(loc) => { setSelectedLocation(loc); setView('workout_focus'); }} />}
-            {view === 'workout_focus' && <WorkoutFocusView location={selectedLocation!} selectedGroups={selectedMuscleGroups} onToggle={(g)=>setSelectedMuscleGroups(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev, g])} onGenerate={async () => { setIsGeneratingRoutine(true); setView('workout_plan'); try { const r = await generateWorkoutRoutine(selectedLocation!, selectedMuscleGroups, profile!); setCurrentRoutine(r); } catch (e) { setView('workout_focus'); } finally { setIsGeneratingRoutine(false); } }} onBack={() => setView('workout_location')} />}
+            {view === 'workout_focus' && <WorkoutFocusView location={selectedLocation!} selectedGroups={selectedMuscleGroups} onToggle={(g)=>setSelectedMuscleGroups(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev, g])} onGenerate={handleGenerateWorkout} onBack={() => setView('workout_location')} />}
             {view === 'workout_plan' && <WorkoutPlanView routine={currentRoutine} isGenerating={isGeneratingRoutine} onBack={() => setView('workout_focus')} />}
             {view === 'analysis' && <AnalysisDetailView analysis={analysis} isAnalyzing={false} onBack={() => setView('home')} onDelete={async () => { if(confirm("Delete record?")) { await deleteDoc(doc(db, "profiles", user!.uid, "scans", analysis!.id)); setScans(prev => prev.filter(s => s.id !== analysis!.id)); setView('home'); } }} />}
           </div>
