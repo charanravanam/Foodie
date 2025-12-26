@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { auth, db } from '../services/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { Mail, Lock, ArrowRight, Loader2, Gift, ShieldAlert, Key, HelpCircle } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2, Gift, ShieldAlert, Key, HelpCircle, AlertCircle } from 'lucide-react';
 
 interface AuthProps {
   onAdminLogin: (status: boolean) => void;
@@ -18,10 +18,26 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const validateForm = () => {
+    if (!email.includes('@')) {
+      setError("Please enter a valid email address.");
+      return false;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return false;
+    }
+    return true;
+  };
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setMessage(null);
+    if (!email) {
+      setError("Enter email to receive reset link.");
+      return;
+    }
     setLoading(true);
     try {
       await sendPasswordResetEmail(auth, email);
@@ -38,13 +54,16 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
     if (isForgotPassword) return handleResetPassword(e);
 
     setError(null);
-    setLoading(true);
-
+    
+    // Admin check bypasses validation for simple dev access
     if (email.toLowerCase() === 'admin' && password === 'adminfoodie') {
       onAdminLogin(true);
-      setLoading(false);
       return;
     }
+
+    if (!validateForm()) return;
+
+    setLoading(true);
 
     try {
       if (isLogin) {
@@ -57,10 +76,14 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
         }
       }
     } catch (err: any) {
-      let msg = "Unexpected error occurred.";
+      console.error("Auth Error:", err.code, err.message);
+      let msg = "Establishment failed. Try again.";
       if (err.code === 'auth/wrong-password') msg = "Incorrect password.";
-      if (err.code === 'auth/user-not-found') msg = "No node found.";
-      if (err.code === 'auth/email-already-in-use') msg = "Node already exists.";
+      if (err.code === 'auth/user-not-found') msg = "No node found with this email.";
+      if (err.code === 'auth/email-already-in-use') msg = "Account already exists. Try logging in.";
+      if (err.code === 'auth/weak-password') msg = "Password is too weak.";
+      if (err.code === 'auth/invalid-email') msg = "Invalid email format.";
+      if (err.code === 'auth/network-request-failed') msg = "Network failure. Check your connection.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -87,7 +110,7 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
               <input
-                type="text"
+                type="email"
                 placeholder="Email Address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -101,7 +124,7 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
                 <input
                   type="password"
-                  placeholder={isLogin ? "Password" : "Create password"}
+                  placeholder={isLogin ? "Password" : "Create password (min. 6 chars)"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[20px] border-none focus:ring-1 focus:ring-black font-bold transition-all shadow-inner text-sm"
@@ -124,8 +147,19 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
             )}
           </div>
 
-          {error && <div className="p-3 bg-red-50 text-red-500 text-[8px] font-black uppercase tracking-widest rounded-xl text-center border border-red-100">{error}</div>}
-          {message && <div className="p-3 bg-green-50 text-green-500 text-[8px] font-black uppercase tracking-widest rounded-xl text-center border border-green-100">{message}</div>}
+          {error && (
+            <div className="p-4 bg-red-50 text-red-600 rounded-2xl flex items-start gap-3 border border-red-100 animate-fade-in">
+              <AlertCircle size={16} className="shrink-0 mt-0.5" />
+              <p className="text-[11px] font-black uppercase tracking-tight leading-tight">{error}</p>
+            </div>
+          )}
+          
+          {message && (
+            <div className="p-4 bg-green-50 text-green-600 rounded-2xl flex items-start gap-3 border border-green-100 animate-fade-in">
+              <Loader2 size={16} className="shrink-0 mt-0.5 animate-spin" />
+              <p className="text-[11px] font-black uppercase tracking-tight leading-tight">{message}</p>
+            </div>
+          )}
 
           <button
             type="submit"

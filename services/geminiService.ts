@@ -10,21 +10,26 @@ async function sleep(ms: number) {
 }
 
 /**
- * Extracts JSON reliably from model response
+ * Robust JSON extraction from model response
  */
 function extractJSON(text: string): any {
+  if (!text) throw new Error("Empty response from metabolic node.");
+  
+  const cleanText = text.trim();
   try {
-    return JSON.parse(text.trim());
+    // Attempt 1: Standard parse
+    return JSON.parse(cleanText);
   } catch (e) {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    // Attempt 2: Extract from markdown blocks or generic brackets
+    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
         return JSON.parse(jsonMatch[0]);
       } catch (e2) {
-        throw new Error("AI returned malformed JSON.");
+        console.error("JSON recovery failed:", e2);
       }
     }
-    throw new Error("Metabolic node output invalid.");
+    throw new Error("Metabolic data corruption: Invalid JSON structure.");
   }
 }
 
@@ -36,22 +41,18 @@ export const generateWorkoutRoutine = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const systemPrompt = `
-    You are an elite fitness coach AI. 
-    Generate a personalized workout routine.
+    You are an elite fitness coach. Create a workout routine.
     Location: ${location}
-    Focus Areas: ${muscleGroups.join(', ')}
+    Focus: ${muscleGroups.join(', ')}
     Goal: ${userProfile.goal}
-    Weight: ${userProfile.weight}kg, Age: ${userProfile.age}
-
-    Requirements:
-    - 4-6 exercises.
-    - Format as JSON array.
+    Stats: ${userProfile.weight}kg, ${userProfile.age}y.
+    Return a JSON array of exercises.
   `;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: [{ parts: [{ text: "Coach, generate my routine based on the system instructions." }] }],
+      contents: { parts: [{ text: "Coach, provide the exercise list now." }] },
       config: {
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
@@ -66,10 +67,9 @@ export const generateWorkoutRoutine = async (
               reps: { type: Type.STRING },
               description: { type: Type.STRING },
               imageUrl: { type: Type.STRING },
-              location: { type: Type.STRING },
               muscleGroups: { type: Type.ARRAY, items: { type: Type.STRING } }
             },
-            required: ["name", "sets", "reps", "description"]
+            required: ["name", "sets", "reps", "description", "muscleGroups"]
           }
         }
       }
@@ -91,30 +91,28 @@ export const analyzeFoodImage = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const systemPrompt = `
-    You are Dr Foodie, an elite clinical nutrition AI node. 
-    Analyze the submitted image for a user with goal: ${userProfile.goal}.
+    You are Dr Foodie, a clinical nutrition AI. 
+    Analyze the meal image for a user with goal: ${userProfile.goal}.
     
-    CRITICAL INSTRUCTIONS:
-    - If the food is not clearly visible, set "needsClarification": true.
-    - Provide strict metabolic data: foodName, calories (number), protein (number), carbs (number), fat (number).
-    - Provide a "healthScore" from 1-10.
-    - "microAnalysis" must be one clinical sentence about metabolic impact.
-    - "alternatives" must be exactly 3 healthier options.
-    - Output must be valid JSON.
+    INSTRUCTIONS:
+    - If food is not identifiable, set "needsClarification": true.
+    - Otherwise, provide: foodName, calories (int), protein (int), carbs (int), fat (int).
+    - Provide "healthScore" (1-10).
+    - "microAnalysis": one clinical sentence on metabolic impact.
+    - "alternatives": exactly 3 healthier options.
+    - Response MUST be valid JSON.
   `;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: [
-          {
-            parts: [
-              { inlineData: { mimeType, data: base64Image } },
-              { text: additionalInfo || "Analyze this meal. Respond in clinical JSON." },
-            ],
-          },
-        ],
+        contents: {
+          parts: [
+            { text: additionalInfo || "Perform metabolic scan on this meal. Response: JSON only." },
+            { inlineData: { mimeType, data: base64Image } }
+          ],
+        },
         config: {
           systemInstruction: systemPrompt,
           responseMimeType: "application/json",
@@ -139,10 +137,9 @@ export const analyzeFoodImage = async (
       });
 
       const text = response.text;
-      if (!text) throw new Error("Null response from AI.");
       return extractJSON(text);
     } catch (error: any) {
-      console.warn(`Scan attempt ${attempt + 1} failed:`, error);
+      console.warn(`Metabolic node attempt ${attempt + 1} fail:`, error);
       if (attempt < MAX_RETRIES - 1) {
         await sleep(INITIAL_RETRY_DELAY * (attempt + 1));
         continue;

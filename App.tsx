@@ -30,9 +30,9 @@ const REFERRAL_BONUS_PREMIUM = 250;
 
 const resizeImage = (base64Str: string, maxWidth = 1024, maxHeight = 1024): Promise<string> => {
   return new Promise((resolve, reject) => {
-    if (base64Str.length < 100) return reject(new Error("Invalid image string"));
+    if (!base64Str || base64Str.length < 50) return reject(new Error("Invalid image source"));
     const img = new window.Image();
-    const timeout = setTimeout(() => reject(new Error("Image processing timed out")), 8000);
+    const timeout = setTimeout(() => reject(new Error("Image processing timed out")), 10000);
     img.onload = () => {
       clearTimeout(timeout);
       try {
@@ -53,9 +53,9 @@ const resizeImage = (base64Str: string, maxWidth = 1024, maxHeight = 1024): Prom
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error("Could not get canvas context");
+        if (!ctx) throw new Error("Canvas context failed");
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
       } catch (err) {
         reject(err);
       }
@@ -81,14 +81,13 @@ const PendingScanCard: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    // 5 second progress bar simulation
     const duration = 5000;
-    const intervalTime = 100;
+    const intervalTime = 50;
     const steps = duration / intervalTime;
     const increment = 100 / steps;
 
     const interval = setInterval(() => {
-      setProgress(prev => (prev >= 95 ? 95 : prev + increment));
+      setProgress(prev => (prev >= 98 ? 98 : prev + increment));
     }, intervalTime);
     return () => clearInterval(interval);
   }, []);
@@ -101,7 +100,7 @@ const PendingScanCard: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
       <div className="flex-1 min-w-0">
         <div className="font-black text-sm tracking-tight text-gray-400">Processing Meal...</div>
         <div className="text-[9px] text-black font-black uppercase tracking-widest mt-1 flex items-center gap-1.5">
-          <Loader2 size={10} className="animate-spin" /> Analyzing Metabolic Density
+          <Loader2 size={10} className="animate-spin" /> Metabolic Density Scan
         </div>
       </div>
       <div 
@@ -255,7 +254,7 @@ const StatsView: React.FC<{ scans: ScanHistoryItem[]; currentCalTarget: number; 
         <h1 className="text-2xl font-black tracking-tight text-black">Insights</h1>
       </div>
 
-      <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-50 space-y-6">
+      <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-6">
          <div className="flex justify-between items-center">
            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] px-1">Calorie Trend</h3>
            <div className="bg-black text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">Metabolism</div>
@@ -519,7 +518,7 @@ const TeamSection: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       </div>
 
       <div className="space-y-8 mt-4">
-        {/* Founder Card - Based on Screenshot */}
+        {/* Founder Card */}
         <div className="bg-black text-white p-10 rounded-[45px] relative overflow-hidden shadow-2xl transition-transform hover:scale-[1.02] active:scale-100">
            <div className="absolute top-6 right-8 opacity-20 pointer-events-none">
               <Crown size={80} className="text-white" strokeWidth={1} />
@@ -531,7 +530,6 @@ const TeamSection: React.FC<{ onBack: () => void }> = ({ onBack }) => {
            </div>
         </div>
 
-        {/* Core Team Members - Strictly requested list */}
         <div className="bg-white rounded-[45px] p-8 shadow-card border border-gray-50 space-y-6">
            <div className="flex items-center gap-3">
               <Users size={18} className="text-gray-300" />
@@ -760,9 +758,9 @@ const ClarificationModal: React.FC<{
         
         <textarea
           value={answer}
-          onChange={(e) => setAnswer(maxLen(e.target.value, 100))}
+          onChange={(e) => setAnswer(e.target.value.substring(0, 200))}
           placeholder="e.g. It's a chicken salad with olive oil dressing"
-          className="w-full p-5 rounded-3xl bg-gray-50 border-none font-bold text-sm shadow-inner min-h-[120px] focus:ring-1 focus:ring-black transition-all resize-none"
+          className="w-full p-5 rounded-3xl bg-gray-50 border-none font-bold text-sm shadow-inner min-h-[120px] focus:ring-1 focus:ring-black transition-all resize-none shadow-inner"
         />
 
         <div className="space-y-3">
@@ -783,10 +781,6 @@ const ClarificationModal: React.FC<{
     </div>
   );
 };
-
-function maxLen(s: string, n: number) {
-  return s.length > n ? s.substring(0, n) : s;
-}
 
 const WorkoutLocationView: React.FC<{ onBack: () => void; onSelect: (loc: WorkoutLocation) => void }> = ({ onBack, onSelect }) => {
   return (
@@ -861,7 +855,6 @@ const App: React.FC = () => {
   const [view, setView] = useState<'home' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team' | 'wallet' | 'refer' | 'admin_users' | 'admin_user_edit' | 'admin_payments' | 'admin_transfers' | 'admin_dashboard' | 'workout_location' | 'workout_focus' | 'workout_plan' | 'update_profile'>('home');
   const [scans, setScans] = useState<(ScanHistoryItem & { isPending?: boolean; hasError?: boolean })[]>([]);
   const [showPremium, setShowPremium] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<ScanHistoryItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toDateString());
@@ -900,7 +893,14 @@ const App: React.FC = () => {
     if (adminSession === 'true') { setIsAdmin(true); if (view === 'home') setView('admin_dashboard'); }
     const unsub = onAuthStateChanged(auth, async (u) => {
       setLoading(true);
-      if (u) { setUser(u); await fetchProfile(u); } 
+      if (u) { 
+        setUser(u); 
+        try {
+          await fetchProfile(u); 
+        } catch (err) {
+          console.error("Profile initialization error:", err);
+        }
+      } 
       else { setUser(null); setProfile(null); }
       setLoading(false);
     });
@@ -933,6 +933,8 @@ const App: React.FC = () => {
     if (referralCode && !profileData.hasClaimedSignupReferral) {
       try {
         const q = query(collection(db, "profiles"), where("referralCode", "==", referralCode.toUpperCase()));
+        // Note: This query may fail if Firestore rules don't permit wide searching of profiles.
+        // We catch the error to ensure login process is not blocked.
         const snap = await getDocs(q);
         
         if (!snap.empty) {
@@ -950,9 +952,10 @@ const App: React.FC = () => {
             });
           }
         }
-        localStorage.removeItem(`pending_referral_${uId}`);
       } catch (e) {
-        console.error("Referral processing error:", e);
+        console.warn("Referral code validation failed or permission denied:", e);
+      } finally {
+        localStorage.removeItem(`pending_referral_${uId}`);
       }
     }
   };
@@ -962,7 +965,11 @@ const App: React.FC = () => {
       const docSnap = await getDoc(doc(db, "profiles", u.uid));
       if (docSnap.exists()) {
         let pData = docSnap.data() as UserProfile;
-        if (pData.isDisabled) { alert("Account disabled."); signOut(auth); return; }
+        if (pData.isDisabled) { 
+          alert("Node access terminated by protocol."); 
+          signOut(auth); 
+          return; 
+        }
         
         await handlePendingReferral(u.uid, pData);
         
@@ -970,9 +977,17 @@ const App: React.FC = () => {
         if (pData.lastLoginDate !== todayStr) {
           pData.currentStreak = (pData.lastLoginDate === new Date(Date.now() - 86400000).toDateString()) ? (pData.currentStreak || 0) + 1 : 1;
           pData.lastLoginDate = todayStr;
-          await updateDoc(doc(db, "profiles", u.uid), { currentStreak: pData.currentStreak, lastLoginDate: todayStr, email: u.email || '' });
+          await updateDoc(doc(db, "profiles", u.uid), { 
+            currentStreak: pData.currentStreak, 
+            lastLoginDate: todayStr, 
+            email: u.email || '' 
+          });
         }
-        if (pData.lastScanResetDate !== todayStr) { pData.scansUsedToday = 0; pData.lastScanResetDate = todayStr; await updateDoc(doc(db, "profiles", u.uid), { scansUsedToday: 0, lastScanResetDate: todayStr }); }
+        if (pData.lastScanResetDate !== todayStr) { 
+          pData.scansUsedToday = 0; 
+          pData.lastScanResetDate = todayStr; 
+          await updateDoc(doc(db, "profiles", u.uid), { scansUsedToday: 0, lastScanResetDate: todayStr }); 
+        }
         
         const updatedSnap = await getDoc(doc(db, "profiles", u.uid));
         setProfile(updatedSnap.data() as UserProfile);
@@ -984,17 +999,44 @@ const App: React.FC = () => {
         setScans(ls);
       } else {
         const newCode = `INR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-        setProfile({ isOnboarded: false, name: '', age: 0, gender: Gender.MALE, height: 0, weight: 0, targetWeight: 0, durationWeeks: 12, goal: Goal.MAINTAIN, referralCode: u.uid.substring(0,8).toUpperCase(), points: 0, uniqueTransferCode: newCode, currentStreak: 1, lastLoginDate: new Date().toDateString(), email: u.email || '' } as UserProfile);
+        setProfile({ 
+          isOnboarded: false, 
+          name: '', 
+          age: 0, 
+          gender: Gender.MALE, 
+          height: 0, 
+          weight: 0, 
+          targetWeight: 0, 
+          durationWeeks: 12, 
+          goal: Goal.MAINTAIN, 
+          referralCode: u.uid.substring(0,8).toUpperCase(), 
+          points: 0, 
+          uniqueTransferCode: newCode, 
+          currentStreak: 1, 
+          lastLoginDate: new Date().toDateString(), 
+          email: u.email || '' 
+        } as UserProfile);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error("Profile fetch error:", e); 
+      // Ensure local state at least knows we're not onboarded if document is missing/unreachable
+      if (!profile) {
+        setProfile({ isOnboarded: false } as UserProfile);
+      }
+    }
   };
 
   const saveProfile = async (data: Partial<UserProfile>) => {
     if (!user) return;
-    const updated = { ...profile, ...data };
-    await setDoc(doc(db, "profiles", user.uid), updated, { merge: true });
-    setProfile(updated as UserProfile);
-    setView('settings');
+    try {
+      const updated = { ...profile, ...data };
+      await setDoc(doc(db, "profiles", user.uid), updated, { merge: true });
+      setProfile(updated as UserProfile);
+      setView('home'); // Redirect to home after onboarding or update
+    } catch (err) {
+      console.error("Save profile error:", err);
+      alert("Failed to sync metabolic metrics.");
+    }
   };
 
   const handleUpgrade = async () => {
@@ -1017,7 +1059,7 @@ const App: React.FC = () => {
       alert("Pro Protocol Established.");
     } catch (e) {
       console.error("Upgrade error:", e);
-      alert("Upgrade failed. Contact support.");
+      alert("Upgrade failed. Check network stability.");
     }
   };
 
@@ -1026,20 +1068,22 @@ const App: React.FC = () => {
     if (!profile.isPremium && (profile.scansUsedToday || 0) >= MAX_FREE_SCANS_PER_DAY) { setShowPremium(true); return; }
     
     const tempId = `temp-${Date.now()}`;
-    const optimizedBase64 = await resizeImage(base64);
+    let optimizedBase64 = base64;
+    
+    try {
+      optimizedBase64 = await resizeImage(base64);
+    } catch (e) {
+      console.warn("Resize failed, using source:", e);
+    }
     
     const pendingItem: any = {
       id: tempId,
       imageUrl: optimizedBase64,
       timestamp: new Date().toISOString(),
       isPending: true,
-      foodName: 'Processing...',
-      calories: 0,
-      protein: 0,
-      carbs: 0,
-      fat: 0,
-      healthScore: 0,
-      microAnalysis: 'Computing metabolic density...',
+      foodName: 'Analysis in Progress...',
+      calories: 0, protein: 0, carbs: 0, fat: 0, healthScore: 0,
+      microAnalysis: 'Scanning metabolic nodes...',
       mealType: 'Snack',
       alternatives: []
     };
@@ -1049,7 +1093,7 @@ const App: React.FC = () => {
     setView('home');
 
     try {
-      const base64Data = optimizedBase64.split(',')[1];
+      const base64Data = optimizedBase64.includes(',') ? optimizedBase64.split(',')[1] : optimizedBase64;
       const result = await analyzeFoodImage(base64Data, profile, clarification);
       
       if (result.needsClarification) { 
@@ -1078,7 +1122,7 @@ const App: React.FC = () => {
       setScans(prev => prev.map(s => s.id === tempId ? newScan : s));
       setProfile(prev => prev ? { ...prev, scansUsedToday: (prev.scansUsedToday || 0) + 1, points: (prev.points || 0) + COINS_PER_SCAN } : null);
     } catch (err) { 
-      console.error("Scan error:", err);
+      console.error("Background Scan Error:", err);
       setScans(prev => prev.map(s => s.id === tempId ? { ...s, isPending: false, hasError: true, foodName: 'Scan Failed' } : s));
     }
   };
@@ -1091,7 +1135,7 @@ const App: React.FC = () => {
       const snap = await getDocs(q);
       if (snap.empty) { alert("Recipient node not found."); return; }
       const recipientDoc = snap.docs[0];
-      if (recipientDoc.id === user.uid) { alert("Direct loops rejected."); return; }
+      if (recipientDoc.id === user.uid) { alert("Loopback rejected."); return; }
       await runTransaction(db, async (tx) => {
         tx.update(doc(db, "profiles", user.uid), { points: increment(-coins) });
         tx.update(doc(db, "profiles", recipientDoc.id), { points: increment(coins) });
@@ -1104,8 +1148,8 @@ const App: React.FC = () => {
         });
       });
       setProfile(prev => prev ? { ...prev, points: (prev.points || 0) - coins } : null);
-      alert("Transfer protocol established.");
-    } catch (e) { alert("Vault communication failed."); }
+      alert("Peer transfer authorized.");
+    } catch (e) { alert("Vault node unreachable."); }
   };
 
   const adminUpdateUser = async (uid: string, data: Partial<UserProfile>) => {
@@ -1125,7 +1169,7 @@ const App: React.FC = () => {
         canvasRef.current.width = videoRef.current.videoWidth;
         canvasRef.current.height = videoRef.current.videoHeight;
         context.drawImage(videoRef.current, 0, 0);
-        processImage(canvasRef.current.toDataURL('image/jpeg', 0.8));
+        processImage(canvasRef.current.toDataURL('image/jpeg', 0.7));
       }
     }
   };
@@ -1133,7 +1177,7 @@ const App: React.FC = () => {
   const currentCalTarget = useMemo(() => {
     if (!profile) return 2000;
     const s = profile.gender === Gender.FEMALE ? -161 : 5;
-    const bmr = (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + s;
+    const bmr = (10 * profile.weight) + (6.25 * profile.height) - (5 * (profile.age || 25)) + s;
     const maintenance = Math.round(bmr * 1.375);
     return profile.goal === Goal.LOSE_WEIGHT ? maintenance - 500 : profile.goal === Goal.GAIN_WEIGHT ? maintenance + 500 : maintenance;
   }, [profile]);
@@ -1224,7 +1268,7 @@ const App: React.FC = () => {
             {view === 'workout_location' && <WorkoutLocationView onBack={() => setView('home')} onSelect={(loc) => { setSelectedLocation(loc); setView('workout_focus'); }} />}
             {view === 'workout_focus' && <WorkoutFocusView location={selectedLocation!} selectedGroups={selectedMuscleGroups} onToggle={(g)=>setSelectedMuscleGroups(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev, g])} onGenerate={async () => { setIsGeneratingRoutine(true); setView('workout_plan'); try { const r = await generateWorkoutRoutine(selectedLocation!, selectedMuscleGroups, profile!); setCurrentRoutine(r); } catch (e) { setView('workout_focus'); } finally { setIsGeneratingRoutine(false); } }} onBack={() => setView('workout_location')} />}
             {view === 'workout_plan' && <WorkoutPlanView routine={currentRoutine} isGenerating={isGeneratingRoutine} onBack={() => setView('workout_focus')} />}
-            {view === 'analysis' && <AnalysisDetailView analysis={analysis} isAnalyzing={isAnalyzing} onBack={() => setView('home')} onDelete={async () => { if(confirm("Delete record?")) { await deleteDoc(doc(db, "profiles", user!.uid, "scans", analysis!.id)); setScans(prev => prev.filter(s => s.id !== analysis!.id)); setView('home'); } }} />}
+            {view === 'analysis' && <AnalysisDetailView analysis={analysis} isAnalyzing={false} onBack={() => setView('home')} onDelete={async () => { if(confirm("Delete record?")) { await deleteDoc(doc(db, "profiles", user!.uid, "scans", analysis!.id)); setScans(prev => prev.filter(s => s.id !== analysis!.id)); setView('home'); } }} />}
           </div>
         )}
       </div>
