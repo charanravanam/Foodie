@@ -24,6 +24,7 @@ import { auth, db } from './services/firebase';
 
 const MAX_FREE_SCANS_PER_DAY = 3;
 const COINS_PER_SCAN = 5;
+const WORKOUT_UNLOCK_COST = 500;
 const REFERRAL_BONUS_SENDER = 100;
 const REFERRAL_BONUS_RECEIVER = 50;
 const REFERRAL_BONUS_PREMIUM = 250;
@@ -788,6 +789,75 @@ const ClarificationModal: React.FC<{
   );
 };
 
+const UnlockWorkoutView: React.FC<{
+  currentGems: number;
+  isUnlocking: boolean;
+  onUnlock: () => void;
+  onGoToWallet: () => void;
+  onBack: () => void;
+}> = ({ currentGems, isUnlocking, onUnlock, onGoToWallet, onBack }) => {
+  const hasEnough = currentGems >= WORKOUT_UNLOCK_COST;
+  return (
+    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+        <h1 className="text-2xl font-black tracking-tight text-black">Training Node</h1>
+      </div>
+
+      <div className="bg-[#0A0A0A] text-white p-10 rounded-[45px] relative overflow-hidden shadow-2xl border border-white/5 text-center">
+         <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.2),transparent_70%)]" />
+         <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10 backdrop-blur-md">
+            <Lock className="text-yellow-400" size={32} />
+         </div>
+         <h2 className="text-2xl font-black mb-3 uppercase tracking-tight">Clinical Training Module</h2>
+         <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed mb-8">Unlock personalized workout routines designed for your metabolic profile.</p>
+         
+         <div className="inline-flex items-center gap-3 bg-white/5 border border-white/10 rounded-full px-6 py-3 mb-6">
+            <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">COST:</div>
+            <div className="flex items-center gap-2">
+               <span className="text-xl font-black tracking-tighter text-yellow-400">500</span>
+               <Gem className="text-yellow-400" size={16} />
+            </div>
+         </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm flex items-center justify-between">
+           <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-yellow-50 rounded-xl flex items-center justify-center text-yellow-600 shadow-inner">
+                 <Gem size={20}/>
+              </div>
+              <div>
+                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Your Balance</div>
+                <div className="text-xl font-black tracking-tighter">{formatCoins(currentGems)} Gems</div>
+              </div>
+           </div>
+           {!hasEnough && <div className="text-[9px] font-black text-red-500 bg-red-50 px-3 py-1.5 rounded-full uppercase">Low Balance</div>}
+        </div>
+
+        {hasEnough ? (
+          <button 
+            onClick={onUnlock}
+            disabled={isUnlocking}
+            className="w-full bg-black text-white py-5 rounded-[28px] font-black text-sm shadow-2xl active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+          >
+            {isUnlocking ? <Loader2 className="animate-spin" size={20}/> : <><ShieldCheck size={20} className="text-yellow-400"/> Authorize Unlock</>}
+          </button>
+        ) : (
+          <button 
+            onClick={onGoToWallet}
+            className="w-full bg-black text-white py-5 rounded-[28px] font-black text-sm shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3"
+          >
+            <Plus size={20} className="text-yellow-400"/> Acquire More Gems
+          </button>
+        )}
+        
+        <p className="text-[9px] text-center text-gray-400 font-bold uppercase tracking-widest px-8">Unlocking grants permanent access to clinical workout generation nodes.</p>
+      </div>
+    </div>
+  );
+};
+
 const WorkoutLocationView: React.FC<{ onBack: () => void; onSelect: (loc: WorkoutLocation) => void }> = ({ onBack, onSelect }) => {
   return (
     <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
@@ -858,7 +928,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [view, setView] = useState<'home' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team' | 'wallet' | 'refer' | 'admin_users' | 'admin_user_edit' | 'admin_payments' | 'admin_transfers' | 'admin_dashboard' | 'workout_location' | 'workout_focus' | 'workout_plan' | 'update_profile'>('home');
+  const [view, setView] = useState<'home' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team' | 'wallet' | 'refer' | 'admin_users' | 'admin_user_edit' | 'admin_payments' | 'admin_transfers' | 'admin_dashboard' | 'workout_unlock' | 'workout_location' | 'workout_focus' | 'workout_plan' | 'update_profile'>('home');
   const [scans, setScans] = useState<(ScanHistoryItem & { isPending?: boolean; hasError?: boolean })[]>([]);
   const [showPremium, setShowPremium] = useState(false);
   const [analysis, setAnalysis] = useState<ScanHistoryItem | null>(null);
@@ -870,6 +940,7 @@ const App: React.FC = () => {
   const [selectedMuscleGroups, setSelectedMuscleGroups] = useState<MuscleGroup[]>([]);
   const [currentRoutine, setCurrentRoutine] = useState<Exercise[]>([]);
   const [isGeneratingRoutine, setIsGeneratingRoutine] = useState(false);
+  const [isUnlockingWorkout, setIsUnlockingWorkout] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [allPayments, setAllPayments] = useState<any[]>([]);
   const [allTransfers, setAllTransfers] = useState<any[]>([]);
@@ -1004,7 +1075,7 @@ const App: React.FC = () => {
         setScans(ls);
       } else {
         const newCode = `INR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-        setProfile({ 
+        const newProfile: UserProfile = { 
           isOnboarded: false, 
           name: '', 
           age: 0, 
@@ -1019,8 +1090,10 @@ const App: React.FC = () => {
           uniqueTransferCode: newCode, 
           currentStreak: 1, 
           lastLoginDate: new Date().toDateString(), 
-          email: u.email || '' 
-        } as UserProfile);
+          email: u.email || '',
+          isWorkoutUnlocked: false
+        };
+        setProfile(newProfile);
       }
     } catch (e) { 
       console.error("Profile fetch error:", e); 
@@ -1045,7 +1118,7 @@ const App: React.FC = () => {
     if (!user || !profile) return;
     try {
       await runTransaction(db, async (tx) => {
-        tx.update(doc(db, "profiles", user.uid), { isPremium: true });
+        tx.update(doc(db, "profiles", user.uid), { isPremium: true }); // Strictly premium only
         if (profile.referredBy) {
           tx.update(doc(db, "profiles", profile.referredBy), { points: increment(REFERRAL_BONUS_PREMIUM) });
         }
@@ -1062,6 +1135,30 @@ const App: React.FC = () => {
     } catch (e) {
       console.error("Upgrade error:", e);
       alert("Upgrade failed. Check network stability.");
+    }
+  };
+
+  const handleUnlockWorkout = async () => {
+    if (!user || !profile) return;
+    if ((profile.points || 0) < WORKOUT_UNLOCK_COST) {
+       setView('wallet');
+       return;
+    }
+    setIsUnlockingWorkout(true);
+    try {
+       await runTransaction(db, async (tx) => {
+          tx.update(doc(db, "profiles", user.uid), { 
+             points: increment(-WORKOUT_UNLOCK_COST),
+             isWorkoutUnlocked: true
+          });
+       });
+       setProfile(prev => prev ? { ...prev, points: (prev.points || 0) - WORKOUT_UNLOCK_COST, isWorkoutUnlocked: true } : null);
+       setView('workout_location');
+       alert("Training module authorized.");
+    } catch (e) {
+       alert("Authorization failed.");
+    } finally {
+       setIsUnlockingWorkout(false);
     }
   };
 
@@ -1177,15 +1274,25 @@ const App: React.FC = () => {
   };
 
   const handleGenerateWorkout = async () => {
-    if (!selectedLocation || !profile) return;
+    if (!selectedLocation || !profile) {
+      alert("Neural nodes recalibrating. Try again.");
+      return;
+    }
+    
+    // Switch to plan view with loading indicator
+    setCurrentRoutine([]);
     setIsGeneratingRoutine(true); 
     setView('workout_plan'); 
+    
     try { 
       const r = await generateWorkoutRoutine(selectedLocation, selectedMuscleGroups, profile); 
+      if (!r || r.length === 0) {
+        throw new Error("Empty routine returned");
+      }
       setCurrentRoutine(r); 
     } catch (e) { 
-      console.error("Workout flow error:", e);
-      alert("Neural training node failed. Try fewer muscle groups.");
+      console.error("Workout generation crash:", e);
+      alert("Metabolic uplink timed out. Retrying link...");
       setView('workout_focus'); 
     } finally { 
       setIsGeneratingRoutine(false); 
@@ -1283,6 +1390,7 @@ const App: React.FC = () => {
             {view === 'team' && <TeamSection onBack={() => setView('settings')} />}
             {view === 'wallet' && <WalletForm profile={profile} onTransfer={handleTransfer} onBack={() => setView('settings')} />}
             {view === 'refer' && <ReferralView profile={profile} onBack={() => setView('settings')} />}
+            {view === 'workout_unlock' && <UnlockWorkoutView currentGems={profile?.points || 0} isUnlocking={isUnlockingWorkout} onUnlock={handleUnlockWorkout} onGoToWallet={() => setView('wallet')} onBack={() => setView('home')} />}
             {view === 'workout_location' && <WorkoutLocationView onBack={() => setView('home')} onSelect={(loc) => { setSelectedLocation(loc); setView('workout_focus'); }} />}
             {view === 'workout_focus' && <WorkoutFocusView location={selectedLocation!} selectedGroups={selectedMuscleGroups} onToggle={(g)=>setSelectedMuscleGroups(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev, g])} onGenerate={handleGenerateWorkout} onBack={() => setView('workout_location')} />}
             {view === 'workout_plan' && <WorkoutPlanView routine={currentRoutine} isGenerating={isGeneratingRoutine} onBack={() => setView('workout_focus')} />}
@@ -1293,7 +1401,7 @@ const App: React.FC = () => {
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-gray-100 p-4 pb-8 flex justify-between items-center z-40 max-w-md mx-auto px-8 shadow-floating">
         <button onClick={()=>{setView(isAdmin ? 'admin_dashboard' : 'home')}} className={`transition-all ${(view==='home' || view==='admin_dashboard')?'text-black scale-110':'text-black/20'}`}><Home size={22}/></button>
-        <button onClick={()=>{ if (isAdmin) setView('admin_dashboard'); else setView('workout_location'); }} className={`transition-all ${view.startsWith('workout')?'text-black scale-110':'text-black/20'}`}>{isAdmin ? <DollarSign size={22}/> : <Dumbbell size={22}/>}</button>
+        <button onClick={()=>{ if (isAdmin) setView('admin_dashboard'); else if (profile?.isWorkoutUnlocked) setView('workout_location'); else setView('workout_unlock'); }} className={`transition-all ${view.startsWith('workout')?'text-black scale-110':'text-black/20'}`}>{isAdmin ? <DollarSign size={22}/> : <Dumbbell size={22}/>}</button>
         <div className="relative -mt-12 flex justify-center z-50"><button onClick={()=>{ if (isAdmin) setView('admin_users'); else startCamera(); }} className="w-16 h-16 bg-black rounded-full flex items-center justify-center text-white border-[6px] border-[#F2F2F7] shadow-2xl active:scale-90 transition-all">{isAdmin ? <Users size={24}/> : <Plus size={32}/>}</button></div>
         <button onClick={()=>{ if (!isAdmin) setView('stats'); }} className={`transition-all ${view==='stats'?'text-black scale-110':'text-black/20'}`}><BarChart2 size={22}/></button>
         <button onClick={()=>setView('settings')} className={`transition-all ${view==='settings' || view === 'team' ?'text-black scale-110':'text-black/20'}`}><Settings size={22}/></button>

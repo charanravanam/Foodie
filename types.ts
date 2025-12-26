@@ -45,6 +45,7 @@ export interface UserProfile {
   isOnboarded: boolean;
   progressPhotos?: ProgressPhoto[];
   isPremium?: boolean;
+  isWorkoutUnlocked?: boolean;
   dailyWaterGoal?: number;
   scansUsedToday?: number;
   lastScanResetDate?: string;
