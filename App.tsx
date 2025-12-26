@@ -8,7 +8,7 @@ import {
   ShieldCheck, ShieldAlert, DollarSign, Search, History, Heart, 
   Mail, Key, Share, Sparkle, Ban, UserX, Gem, Lock, Zap as Lightning,
   Shield, Bell, HelpCircle, Info, ChevronDown, Image, MessageCircle, Trash2,
-  Edit3, CreditCard
+  Edit3, CreditCard, Save, AlertCircle
 } from 'lucide-react';
 import { onAuthStateChanged, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -24,6 +24,9 @@ import { auth, db } from './services/firebase';
 
 const MAX_FREE_SCANS_PER_DAY = 3;
 const COINS_PER_SCAN = 5;
+const REFERRAL_BONUS_SENDER = 100;
+const REFERRAL_BONUS_RECEIVER = 50;
+const REFERRAL_BONUS_PREMIUM = 250;
 
 const resizeImage = (base64Str: string, maxWidth = 1024, maxHeight = 1024): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -66,13 +69,48 @@ const resizeImage = (base64Str: string, maxWidth = 1024, maxHeight = 1024): Prom
 };
 
 const formatCoins = (num: number) => {
-  if (!num) return '0';
+  if (num === undefined || num === null) return '0';
   if (num < 100000) return num.toLocaleString();
   if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
   return (num / 1000).toFixed(0) + 'k';
 };
 
 // --- Sub-Components ---
+
+const PendingScanCard: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    // 5 second progress bar simulation
+    const duration = 5000;
+    const intervalTime = 100;
+    const steps = duration / intervalTime;
+    const increment = 100 / steps;
+
+    const interval = setInterval(() => {
+      setProgress(prev => (prev >= 95 ? 95 : prev + increment));
+    }, intervalTime);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="bg-white p-4 rounded-[30px] flex gap-4 shadow-card items-center border border-gray-50 relative overflow-hidden animate-fade-in">
+      <div className="w-14 h-14 rounded-2xl bg-gray-50 overflow-hidden shrink-0 border border-gray-100">
+        <img src={imageUrl} className="w-full h-full object-cover opacity-60" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-black text-sm tracking-tight text-gray-400">Processing Meal...</div>
+        <div className="text-[9px] text-black font-black uppercase tracking-widest mt-1 flex items-center gap-1.5">
+          <Loader2 size={10} className="animate-spin" /> Analyzing Metabolic Density
+        </div>
+      </div>
+      <div 
+        className="absolute bottom-0 left-0 h-1 bg-yellow-400 transition-all duration-300" 
+        style={{ width: `${progress}%` }} 
+      />
+    </div>
+  );
+};
 
 const WalletForm: React.FC<{
   profile: UserProfile | null;
@@ -106,6 +144,33 @@ const WalletForm: React.FC<{
          </div>
       </div>
 
+      <div className="bg-white p-6 rounded-[36px] shadow-card border border-gray-100 space-y-4">
+        <div className="flex items-center gap-2 px-1">
+          <Zap size={14} className="text-yellow-500 fill-yellow-500" />
+          <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Earning Protocol</h3>
+        </div>
+        <div className="grid grid-cols-1 gap-2">
+          {[
+            { label: 'Metabolic Scan', desc: 'Per successful scan', reward: '+5 Gems', icon: <Camera size={18} /> },
+            { label: 'Node Expansion', desc: 'Per referral join', reward: '+100 Gems', icon: <Users size={18} /> },
+            { label: 'Premium Upgrade', desc: 'Referral goes Pro', reward: '+250 Gems', icon: <Crown size={18} /> }
+          ].map((item, i) => (
+            <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-[20px]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-black">
+                  {item.icon}
+                </div>
+                <div>
+                  <div className="text-[11px] font-black leading-none">{item.label}</div>
+                  <div className="text-[8px] text-gray-400 font-bold uppercase mt-1">{item.desc}</div>
+                </div>
+              </div>
+              <div className="text-xs font-black text-yellow-600 bg-yellow-50 px-3 py-1.5 rounded-full border border-yellow-100">{item.reward}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="bg-gradient-to-br from-yellow-400 to-yellow-600 p-8 rounded-[40px] shadow-[0_15px_40px_rgba(234,179,8,0.2)] relative overflow-hidden group">
          <div className="absolute -right-8 -bottom-8 opacity-20 group-hover:scale-110 transition-transform duration-700">
             <Lightning size={120} className="text-white fill-white" />
@@ -137,14 +202,14 @@ const WalletForm: React.FC<{
               placeholder="Unique Code (INR-XXXXXX)" 
               value={transferCode} 
               onChange={(e) => setTransferCode(e.target.value.toUpperCase())}
-              className="w-full p-4 rounded-xl bg-gray-50 font-bold border-none outline-none focus:ring-1 focus:ring-black transition-all text-sm shadow-inner"
+              className="w-full p-4 rounded-xl bg-gray-50 border-none font-bold text-sm shadow-inner"
             />
             <input 
               type="number" 
               placeholder="Amount (Coins)" 
               value={transferAmount} 
               onChange={(e) => setTransferAmount(e.target.value)}
-              className="w-full p-4 rounded-xl bg-gray-50 font-bold border-none outline-none focus:ring-1 focus:ring-black transition-all text-sm shadow-inner"
+              className="w-full p-4 rounded-xl bg-gray-50 border-none font-bold text-sm shadow-inner"
             />
             <button 
               onClick={async () => {
@@ -242,12 +307,45 @@ const AdminPanel: React.FC<{
   adminSearch: string;
   setAdminSearch: (v: string) => void;
   setIsAdmin: (v: boolean) => void;
-}> = ({ view, setView, allUsers, allPayments, allTransfers, adminSearch, setAdminSearch, setIsAdmin }) => {
+  onUpdateUser: (uid: string, data: Partial<UserProfile>) => Promise<void>;
+}> = ({ view, setView, allUsers, allPayments, allTransfers, adminSearch, setAdminSearch, setIsAdmin, onUpdateUser }) => {
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [editCoins, setEditCoins] = useState('');
+  const [editPremium, setEditPremium] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
   const filteredUsers = allUsers.filter(u => 
     u.name?.toLowerCase().includes(adminSearch.toLowerCase()) || 
     u.email?.toLowerCase().includes(adminSearch.toLowerCase()) ||
     u.uniqueTransferCode?.toLowerCase().includes(adminSearch.toLowerCase())
   );
+
+  const totalCoinsInCirculation = useMemo(() => {
+    return allUsers.reduce((acc, u) => acc + (u.points || 0), 0);
+  }, [allUsers]);
+
+  const handleEditUser = (user: any) => {
+    setSelectedUser(user);
+    setEditCoins(user.points?.toString() || '0');
+    setEditPremium(user.isPremium || false);
+    setView('admin_user_edit');
+  };
+
+  const saveUserChanges = async () => {
+    if (!selectedUser) return;
+    setIsUpdating(true);
+    try {
+      await onUpdateUser(selectedUser.uid, {
+        points: parseInt(editCoins) || 0,
+        isPremium: editPremium
+      });
+      setView('admin_users');
+    } catch (e) {
+      alert("Node update failed.");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden">
@@ -270,9 +368,13 @@ const AdminPanel: React.FC<{
               </div>
             </div>
             
-            <div className="bg-blue-50 p-8 rounded-[40px] border border-blue-100 text-center space-y-2">
-               <div className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Accumulated Revenue</div>
-               <div className="text-4xl font-black text-blue-600 tracking-tighter">₹{allPayments.reduce((acc, p) => acc + (p.amount || 0), 0)}</div>
+            <div className="bg-yellow-50 p-8 rounded-[40px] border border-yellow-100 text-center space-y-2 relative overflow-hidden group hover:bg-yellow-100 transition-all">
+               <div className="absolute top-0 left-0 w-full h-full opacity-5 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,rgba(234,179,8,0.3),transparent_70%)]" />
+               <div className="text-[8px] font-black text-yellow-600 uppercase tracking-widest">Gems in Circulation</div>
+               <div className="flex items-center justify-center gap-3">
+                  <div className="text-4xl font-black text-yellow-700 tracking-tighter">{formatCoins(totalCoinsInCirculation)}</div>
+                  <Gem size={24} className="text-yellow-500 animate-pulse" />
+               </div>
             </div>
 
             <div className="space-y-3">
@@ -307,18 +409,73 @@ const AdminPanel: React.FC<{
              </div>
              <div className="space-y-2">
                {filteredUsers.map((u: any) => (
-                 <div key={u.uid} className="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center">
+                 <div key={u.uid} onClick={() => handleEditUser(u)} className="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center active:bg-gray-50 cursor-pointer transition-colors">
                    <div>
-                     <div className="font-black text-sm">{u.name || 'Anonymous'}</div>
+                     <div className="font-black text-sm">{u.name || 'Anonymous Agent'}</div>
                      <div className="text-[9px] text-gray-400 font-bold uppercase">{u.email}</div>
                      <div className="text-[7px] text-gray-300 font-bold uppercase tracking-widest mt-0.5">{u.uniqueTransferCode}</div>
+                     <div className="text-[8px] font-black text-blue-500 uppercase tracking-widest mt-1 flex items-center gap-1"><Gem size={8}/> {formatCoins(u.points || 0)}</div>
                    </div>
-                   <div className={`px-2 py-1 rounded-md text-[8px] font-black uppercase ${u.isPremium ? 'bg-black text-yellow-400' : 'bg-gray-50 text-gray-400'}`}>
-                     {u.isPremium ? 'PRO' : 'FREE'}
+                   <div className="flex flex-col items-end gap-2">
+                      <div className={`px-2 py-1 rounded-md text-[8px] font-black uppercase ${u.isPremium ? 'bg-black text-yellow-400' : 'bg-gray-50 text-gray-400'}`}>
+                        {u.isPremium ? 'PRO' : 'FREE'}
+                      </div>
+                      <ChevronRight size={14} className="text-gray-200" />
                    </div>
                  </div>
                ))}
              </div>
+           </div>
+        )}
+
+        {view === 'admin_user_edit' && selectedUser && (
+           <div className="space-y-6 animate-fade-in">
+             <div className="flex items-center gap-3 mb-2">
+               <button onClick={() => setView('admin_users')} className="p-2 bg-gray-50 rounded-lg"><ArrowLeft size={16}/></button>
+               <h2 className="text-lg font-black tracking-tight">Edit Node</h2>
+             </div>
+             
+             <div className="bg-gray-50 p-6 rounded-[32px] border border-gray-100 space-y-1">
+                <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest">AGENT IDENTITY</div>
+                <div className="text-xl font-black">{selectedUser.name || 'Anonymous'}</div>
+                <div className="text-[10px] text-gray-500 font-bold">{selectedUser.email}</div>
+             </div>
+
+             <div className="space-y-4">
+               <div>
+                  <label className="block text-[8px] font-black uppercase text-gray-400 mb-2 tracking-widest px-1">Gems Balance</label>
+                  <div className="relative">
+                    <Gem className="absolute left-4 top-1/2 -translate-y-1/2 text-yellow-500" size={18} />
+                    <input 
+                      type="number" 
+                      value={editCoins} 
+                      onChange={(e) => setEditCoins(e.target.value)}
+                      className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[20px] border-none font-black text-lg shadow-inner focus:ring-1 focus:ring-black"
+                    />
+                  </div>
+               </div>
+
+               <div className="bg-white p-5 rounded-[28px] border border-gray-100 flex items-center justify-between shadow-sm">
+                  <div className="flex items-center gap-4">
+                     <Crown className={editPremium ? 'text-yellow-500' : 'text-gray-300'} size={20} />
+                     <span className="text-sm font-black">Pro Status</span>
+                  </div>
+                  <button 
+                    onClick={() => setEditPremium(!editPremium)}
+                    className={`w-14 h-8 rounded-full relative transition-all duration-300 p-1 ${editPremium ? 'bg-black' : 'bg-gray-200'}`}
+                  >
+                     <div className={`w-6 h-6 bg-white rounded-full shadow-sm transition-all duration-300 ${editPremium ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
+               </div>
+             </div>
+
+             <button 
+               onClick={saveUserChanges}
+               disabled={isUpdating}
+               className="w-full bg-black text-white py-5 rounded-[24px] font-black text-sm shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+             >
+               {isUpdating ? <Loader2 className="animate-spin" size={20}/> : <><Save size={20}/> Deploy Updates</>}
+             </button>
            </div>
         )}
 
@@ -510,7 +667,7 @@ const WorkoutPlanView: React.FC<{ routine: Exercise[]; isGenerating: boolean; on
                  </div>
                </div>
                {ex.imageUrl && (
-                 <div className="w-24 h-24 rounded-2xl bg-gray-50 border border-gray-100 overflow-hidden shrink-0 shadow-sm">
+                 <div className="w-24 h-24 rounded-2xl bg-gray-50 border border-gray-100 overflow-hidden shrink-0 shadow-sm aspect-square">
                    <img src={ex.imageUrl} alt={ex.name} className="w-full h-full object-cover" />
                  </div>
                )}
@@ -531,20 +688,6 @@ const WorkoutPlanView: React.FC<{ routine: Exercise[]; isGenerating: boolean; on
 };
 
 const AnalysisDetailView: React.FC<{ analysis: ScanHistoryItem | null; isAnalyzing: boolean; onBack: () => void; onDelete: () => void }> = ({ analysis, isAnalyzing, onBack, onDelete }) => {
-  if (isAnalyzing) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center p-10 space-y-6 text-center">
-        <div className="w-24 h-24 bg-black rounded-[40px] flex items-center justify-center shadow-2xl relative">
-          <div className="absolute inset-0 bg-white/20 rounded-[40px] animate-ping" />
-          <ScanLine className="text-white animate-bounce" size={40} />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-black tracking-tight">Dr Foodie Analyzing</h2>
-          <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Metabolic Scan...</p>
-        </div>
-      </div>
-    );
-  }
   if (!analysis) return null;
   return (
     <div className="h-full flex flex-col animate-fade-in overflow-hidden bg-[#F2F2F7]">
@@ -584,7 +727,7 @@ const AnalysisDetailView: React.FC<{ analysis: ScanHistoryItem | null; isAnalyzi
         <div className="space-y-3">
            <h3 className="text-[9px] font-black uppercase text-gray-400 tracking-widest px-1">Metabolic Alternatives</h3>
            <div className="grid grid-cols-1 gap-2">
-             {analysis.alternatives.map((alt, i) => (
+             {analysis.alternatives?.map((alt, i) => (
                <div key={i} className="bg-white/50 border border-gray-100 p-4 rounded-2xl flex items-center justify-between group hover:bg-white hover:shadow-sm transition-all">
                  <span className="text-xs font-black text-gray-600">{alt}</span>
                  <Sparkle size={14} className="text-yellow-500 opacity-20 group-hover:opacity-100 transition-opacity" />
@@ -617,9 +760,9 @@ const ClarificationModal: React.FC<{
         
         <textarea
           value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
+          onChange={(e) => setAnswer(maxLen(e.target.value, 100))}
           placeholder="e.g. It's a chicken salad with olive oil dressing"
-          className="w-full p-5 rounded-3xl bg-gray-50 border-none font-bold text-sm shadow-inner min-h-[120px] focus:ring-1 focus:ring-black transition-all resize-none shadow-inner"
+          className="w-full p-5 rounded-3xl bg-gray-50 border-none font-bold text-sm shadow-inner min-h-[120px] focus:ring-1 focus:ring-black transition-all resize-none"
         />
 
         <div className="space-y-3">
@@ -640,6 +783,10 @@ const ClarificationModal: React.FC<{
     </div>
   );
 };
+
+function maxLen(s: string, n: number) {
+  return s.length > n ? s.substring(0, n) : s;
+}
 
 const WorkoutLocationView: React.FC<{ onBack: () => void; onSelect: (loc: WorkoutLocation) => void }> = ({ onBack, onSelect }) => {
   return (
@@ -711,8 +858,8 @@ const App: React.FC = () => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [view, setView] = useState<'home' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team' | 'wallet' | 'refer' | 'admin_users' | 'admin_payments' | 'admin_transfers' | 'admin_dashboard' | 'workout_location' | 'workout_focus' | 'workout_plan' | 'update_profile'>('home');
-  const [scans, setScans] = useState<ScanHistoryItem[]>([]);
+  const [view, setView] = useState<'home' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team' | 'wallet' | 'refer' | 'admin_users' | 'admin_user_edit' | 'admin_payments' | 'admin_transfers' | 'admin_dashboard' | 'workout_location' | 'workout_focus' | 'workout_plan' | 'update_profile'>('home');
+  const [scans, setScans] = useState<(ScanHistoryItem & { isPending?: boolean; hasError?: boolean })[]>([]);
   const [showPremium, setShowPremium] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<ScanHistoryItem | null>(null);
@@ -781,12 +928,44 @@ const App: React.FC = () => {
     }
   }, [isAdmin]);
 
+  const handlePendingReferral = async (uId: string, profileData: UserProfile) => {
+    const referralCode = localStorage.getItem(`pending_referral_${uId}`);
+    if (referralCode && !profileData.hasClaimedSignupReferral) {
+      try {
+        const q = query(collection(db, "profiles"), where("referralCode", "==", referralCode.toUpperCase()));
+        const snap = await getDocs(q);
+        
+        if (!snap.empty) {
+          const referrerDoc = snap.docs[0];
+          const referrerId = referrerDoc.id;
+          
+          if (referrerId !== uId) {
+            await runTransaction(db, async (tx) => {
+              tx.update(doc(db, "profiles", referrerId), { points: increment(REFERRAL_BONUS_SENDER) });
+              tx.update(doc(db, "profiles", uId), { 
+                points: increment(REFERRAL_BONUS_RECEIVER),
+                hasClaimedSignupReferral: true,
+                referredBy: referrerId
+              });
+            });
+          }
+        }
+        localStorage.removeItem(`pending_referral_${uId}`);
+      } catch (e) {
+        console.error("Referral processing error:", e);
+      }
+    }
+  };
+
   const fetchProfile = async (u: FirebaseUser) => {
     try {
       const docSnap = await getDoc(doc(db, "profiles", u.uid));
       if (docSnap.exists()) {
         let pData = docSnap.data() as UserProfile;
         if (pData.isDisabled) { alert("Account disabled."); signOut(auth); return; }
+        
+        await handlePendingReferral(u.uid, pData);
+        
         const todayStr = new Date().toDateString();
         if (pData.lastLoginDate !== todayStr) {
           pData.currentStreak = (pData.lastLoginDate === new Date(Date.now() - 86400000).toDateString()) ? (pData.currentStreak || 0) + 1 : 1;
@@ -794,7 +973,10 @@ const App: React.FC = () => {
           await updateDoc(doc(db, "profiles", u.uid), { currentStreak: pData.currentStreak, lastLoginDate: todayStr, email: u.email || '' });
         }
         if (pData.lastScanResetDate !== todayStr) { pData.scansUsedToday = 0; pData.lastScanResetDate = todayStr; await updateDoc(doc(db, "profiles", u.uid), { scansUsedToday: 0, lastScanResetDate: todayStr }); }
-        setProfile(pData);
+        
+        const updatedSnap = await getDoc(doc(db, "profiles", u.uid));
+        setProfile(updatedSnap.data() as UserProfile);
+        
         const qScans = query(collection(db, "profiles", u.uid, "scans"), orderBy("timestamp", "desc"));
         const qs = await getDocs(qScans);
         const ls: ScanHistoryItem[] = [];
@@ -815,26 +997,90 @@ const App: React.FC = () => {
     setView('settings');
   };
 
+  const handleUpgrade = async () => {
+    if (!user || !profile) return;
+    try {
+      await runTransaction(db, async (tx) => {
+        tx.update(doc(db, "profiles", user.uid), { isPremium: true });
+        if (profile.referredBy) {
+          tx.update(doc(db, "profiles", profile.referredBy), { points: increment(REFERRAL_BONUS_PREMIUM) });
+        }
+        tx.set(doc(collection(db, "payments")), { 
+          uid: user.uid, 
+          userName: profile.name, 
+          amount: 49, 
+          timestamp: Timestamp.now() 
+        });
+      });
+      setProfile(prev => prev ? { ...prev, isPremium: true } : null);
+      setShowPremium(false);
+      alert("Pro Protocol Established.");
+    } catch (e) {
+      console.error("Upgrade error:", e);
+      alert("Upgrade failed. Contact support.");
+    }
+  };
+
   const processImage = async (base64: string, clarification?: string) => {
     if (!user || !profile) return;
     if (!profile.isPremium && (profile.scansUsedToday || 0) >= MAX_FREE_SCANS_PER_DAY) { setShowPremium(true); return; }
-    setIsAnalyzing(true);
-    setView('analysis');
-    setClarificationQuestion(null);
+    
+    const tempId = `temp-${Date.now()}`;
+    const optimizedBase64 = await resizeImage(base64);
+    
+    const pendingItem: any = {
+      id: tempId,
+      imageUrl: optimizedBase64,
+      timestamp: new Date().toISOString(),
+      isPending: true,
+      foodName: 'Processing...',
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      healthScore: 0,
+      microAnalysis: 'Computing metabolic density...',
+      mealType: 'Snack',
+      alternatives: []
+    };
+
+    setScans(prev => [pendingItem, ...prev]);
+    setSelectedDate(new Date().toDateString());
+    setView('home');
+
     try {
-      const optimizedBase64 = await resizeImage(base64);
       const base64Data = optimizedBase64.split(',')[1];
       const result = await analyzeFoodImage(base64Data, profile, clarification);
-      if (result.needsClarification) { setClarificationQuestion(result.clarificationQuestion); setPendingImage(optimizedBase64); setIsAnalyzing(false); return; }
-      const scanItem: Omit<ScanHistoryItem, 'id'> = { ...result, imageUrl: optimizedBase64, timestamp: new Date().toISOString() };
+      
+      if (result.needsClarification) { 
+        setClarificationQuestion(result.clarificationQuestion); 
+        setPendingImage(optimizedBase64); 
+        setScans(prev => prev.filter(s => s.id !== tempId));
+        return; 
+      }
+      
+      const scanItem: Omit<ScanHistoryItem, 'id'> = { 
+        ...result, 
+        imageUrl: optimizedBase64, 
+        timestamp: new Date().toISOString(),
+        mealType: result.mealType || 'Snack',
+        alternatives: result.alternatives || []
+      };
+      
       const docRef = await addDoc(collection(db, "profiles", user.uid, "scans"), scanItem);
       const newScan = { id: docRef.id, ...scanItem } as ScanHistoryItem;
-      await updateDoc(doc(db, "profiles", user.uid), { scansUsedToday: increment(1), points: increment(COINS_PER_SCAN) });
-      setScans(prev => [newScan, ...prev]);
-      setAnalysis(newScan);
+      
+      await updateDoc(doc(db, "profiles", user.uid), { 
+        scansUsedToday: increment(1), 
+        points: increment(COINS_PER_SCAN) 
+      });
+      
+      setScans(prev => prev.map(s => s.id === tempId ? newScan : s));
       setProfile(prev => prev ? { ...prev, scansUsedToday: (prev.scansUsedToday || 0) + 1, points: (prev.points || 0) + COINS_PER_SCAN } : null);
-    } catch (err) { setView('home'); alert("Metabolic Node Latency. Retry."); }
-    finally { setIsAnalyzing(false); }
+    } catch (err) { 
+      console.error("Scan error:", err);
+      setScans(prev => prev.map(s => s.id === tempId ? { ...s, isPending: false, hasError: true, foodName: 'Scan Failed' } : s));
+    }
   };
 
   const handleTransfer = async (code: string, coins: number) => {
@@ -843,17 +1089,33 @@ const App: React.FC = () => {
     try {
       const q = query(collection(db, "profiles"), where("uniqueTransferCode", "==", code));
       const snap = await getDocs(q);
-      if (snap.empty) { alert("Node not found."); return; }
+      if (snap.empty) { alert("Recipient node not found."); return; }
       const recipientDoc = snap.docs[0];
-      if (recipientDoc.id === user.uid) { alert("Self-transfer rejected."); return; }
+      if (recipientDoc.id === user.uid) { alert("Direct loops rejected."); return; }
       await runTransaction(db, async (tx) => {
         tx.update(doc(db, "profiles", user.uid), { points: increment(-coins) });
         tx.update(doc(db, "profiles", recipientDoc.id), { points: increment(coins) });
-        tx.set(doc(collection(db, "transfers")), { senderId: user.uid, senderName: profile.name, recipientCode: code, coins, timestamp: Timestamp.now() });
+        tx.set(doc(collection(db, "transfers")), { 
+          senderId: user.uid, 
+          senderName: profile.name, 
+          recipientCode: code, 
+          coins, 
+          timestamp: Timestamp.now() 
+        });
       });
       setProfile(prev => prev ? { ...prev, points: (prev.points || 0) - coins } : null);
-      alert("Transfer Authorized.");
-    } catch (e) { alert("Transfer protocol failed."); }
+      alert("Transfer protocol established.");
+    } catch (e) { alert("Vault communication failed."); }
+  };
+
+  const adminUpdateUser = async (uid: string, data: Partial<UserProfile>) => {
+    try {
+      await updateDoc(doc(db, "profiles", uid), data);
+      alert("Node metrics updated.");
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
   };
 
   const captureImage = () => {
@@ -885,7 +1147,7 @@ const App: React.FC = () => {
       <canvas ref={canvasRef} className="hidden" />
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = () => processImage(r.result as string); r.readAsDataURL(f); } }} />
       <div className="flex-1 overflow-hidden h-full">
-        {isAdmin ? <AdminPanel view={view} setView={setView} allUsers={allUsers} allPayments={allPayments} allTransfers={allTransfers} adminSearch={adminSearch} setAdminSearch={setAdminSearch} setIsAdmin={setIsAdmin} /> : (
+        {isAdmin ? <AdminPanel view={view} setView={setView} allUsers={allUsers} allPayments={allPayments} allTransfers={allTransfers} adminSearch={adminSearch} setAdminSearch={setAdminSearch} setIsAdmin={setIsAdmin} onUpdateUser={adminUpdateUser} /> : (
           <div className="animate-fade-in px-0 h-full overflow-hidden">
             {view === 'home' && (
               <div className="pt-5 h-full overflow-y-auto no-scrollbar pb-32 px-5">
@@ -900,7 +1162,22 @@ const App: React.FC = () => {
                 </div>
                 <div className="bg-white p-8 rounded-[40px] shadow-card mb-6 flex items-center justify-between border border-gray-100"><div className="flex-1"><div className="flex items-baseline gap-1"><span className="text-5xl font-black tracking-tighter leading-none">{scans.filter(s => new Date(s.timestamp).toDateString() === selectedDate).reduce((acc, s) => acc + (s.calories || 0), 0)}</span><span className="text-base text-gray-300 font-bold">/{currentCalTarget}</span></div><div className="text-[8px] text-gray-400 font-black uppercase tracking-[0.3em] mt-3">ENERGY BUDGET</div></div><Activity className="text-black opacity-5" size={70} /></div>
                 <div className="space-y-3">
-                  {scans.filter(s => new Date(s.timestamp).toDateString() === selectedDate).length === 0 ? <div className="text-center py-16 text-gray-300 bg-white rounded-[40px] border-2 border-dashed border-gray-100 flex flex-col items-center gap-3 cursor-pointer active:scale-[0.98]" onClick={startCamera}><Camera size={36} className="opacity-10"/><p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Start New Scan</p></div> : scans.filter(s => new Date(s.timestamp).toDateString() === selectedDate).map(s => <div key={s.id} onClick={()=>{setAnalysis(s); setView('analysis')}} className="bg-white p-4 rounded-[30px] flex gap-4 shadow-card items-center border border-gray-50 active:scale-95 transition-all"><img src={s.imageUrl} className="w-14 h-14 rounded-2xl object-cover shadow-sm" /><div className="flex-1 min-w-0"><div className="font-black text-sm tracking-tight truncate">{s.foodName}</div><div className="text-[9px] text-gray-400 font-black uppercase tracking-widest mt-1">{s.calories} kcal • {s.protein}g P</div></div><ChevronRight size={16} className="text-gray-200 flex-shrink-0"/></div>)}
+                  {scans.filter(s => new Date(s.timestamp).toDateString() === selectedDate).length === 0 ? <div className="text-center py-16 text-gray-300 bg-white rounded-[40px] border-2 border-dashed border-gray-100 flex flex-col items-center gap-3 cursor-pointer active:scale-[0.98]" onClick={startCamera}><Camera size={36} className="opacity-10"/><p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Start New Scan</p></div> : scans.filter(s => new Date(s.timestamp).toDateString() === selectedDate).map(s => (
+                    s.isPending ? (
+                      <PendingScanCard key={s.id} imageUrl={s.imageUrl!} />
+                    ) : (
+                      <div key={s.id} onClick={()=>{setAnalysis(s); setView('analysis')}} className={`bg-white p-4 rounded-[30px] flex gap-4 shadow-card items-center border border-gray-50 active:scale-95 transition-all ${s.hasError ? 'border-red-100' : ''}`}>
+                        <img src={s.imageUrl} className={`w-14 h-14 rounded-2xl object-cover shadow-sm ${s.hasError ? 'grayscale' : ''}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className={`font-black text-sm tracking-tight truncate ${s.hasError ? 'text-red-500' : ''}`}>{s.foodName}</div>
+                          <div className="text-[9px] text-gray-400 font-black uppercase tracking-widest mt-1">
+                            {s.hasError ? 'Analysis Failed' : `${s.calories} kcal • ${s.protein}g P`}
+                          </div>
+                        </div>
+                        {s.hasError ? <AlertCircle size={16} className="text-red-400" /> : <ChevronRight size={16} className="text-gray-200 flex-shrink-0"/>}
+                      </div>
+                    )
+                  ))}
                 </div>
               </div>
             )}
@@ -961,7 +1238,7 @@ const App: React.FC = () => {
       </nav>
 
       {clarificationQuestion && pendingImage && <ClarificationModal question={clarificationQuestion} onAnswer={(ans) => processImage(pendingImage, ans)} onApprox={() => processImage(pendingImage, "Approximate")} onCancel={() => setClarificationQuestion(null)} />}
-      <PremiumModal isOpen={showPremium} onClose={()=>setShowPremium(false)} onUpgrade={() => { setProfile(p => p ? {...p, isPremium: true} : null); setShowPremium(false); }} />
+      <PremiumModal isOpen={showPremium} onClose={()=>setShowPremium(false)} onUpgrade={handleUpgrade} />
       {view === 'camera' && (
           <div className="fixed inset-0 z-[100] bg-black animate-fade-in flex flex-col">
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
