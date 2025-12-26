@@ -8,7 +8,7 @@ import {
   ShieldCheck, ShieldAlert, DollarSign, Search, History, Heart, 
   Mail, Key, Share, Sparkle, Ban, UserX, Gem, Lock, Zap as Lightning,
   Shield, Bell, HelpCircle, Info, ChevronDown, Image, MessageCircle, Trash2,
-  Edit3, CreditCard, Save, AlertCircle
+  Edit3, CreditCard, Save, AlertCircle, Banknote, Wallet, Smartphone
 } from 'lucide-react';
 import { onAuthStateChanged, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -143,6 +143,19 @@ const WalletForm: React.FC<{
            USER ID: {profile?.uniqueTransferCode || 'Generating...'}
          </div>
       </div>
+
+      {profile?.upiId && (
+        <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Smartphone className="text-gray-300" size={18} />
+            <div>
+               <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Payout Node</div>
+               <div className="text-xs font-black tracking-tight">{profile.upiId}</div>
+            </div>
+          </div>
+          <div className="bg-green-50 text-green-500 px-2 py-1 rounded-md text-[8px] font-black uppercase">Verified</div>
+        </div>
+      )}
 
       <div className="bg-white p-6 rounded-[36px] shadow-card border border-gray-100 space-y-4">
         <div className="flex items-center gap-2 px-1">
@@ -559,6 +572,166 @@ const TeamSection: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   );
 };
 
+// --- UPI Entry View Component ---
+const UPIEntryView: React.FC<{ 
+  onSave: (upiId: string) => Promise<void>; 
+  onBack: () => void 
+}> = ({ onSave, onBack }) => {
+  const [upi, setUpi] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!upi.includes('@')) {
+      alert("Invalid UPI format. Missing '@' node.");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await onSave(upi);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
+          <ArrowLeft size={18}/>
+        </button>
+        <h1 className="text-2xl font-black tracking-tight text-black">Payout Node</h1>
+      </div>
+
+      <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-6 text-center">
+         <div className="w-16 h-16 bg-blue-50 rounded-[24px] flex items-center justify-center mx-auto shadow-inner">
+            <Smartphone className="text-blue-500" size={32} />
+         </div>
+         <div className="space-y-2">
+            <h2 className="text-xl font-black tracking-tight uppercase">Establish Uplink</h2>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed px-4">
+              Enter your UPI ID to authorize metabolic reward transfers. This will be your primary settlement terminal.
+            </p>
+         </div>
+
+         <div className="space-y-4">
+            <input 
+              type="text" 
+              placeholder="agent@bank" 
+              value={upi} 
+              onChange={(e) => setUpi(e.target.value.toLowerCase())}
+              className="w-full p-5 rounded-2xl bg-gray-50 border-none font-bold text-center text-sm shadow-inner focus:ring-1 focus:ring-black"
+            />
+            <button 
+              onClick={handleSave}
+              disabled={isSaving || !upi}
+              className="w-full bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-30"
+            >
+              {isSaving ? <Loader2 className="animate-spin mx-auto" size={16}/> : "Sync Terminal"}
+            </button>
+         </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Cashout View Component ---
+const CashoutView: React.FC<{ profile: UserProfile | null; onBack: () => void }> = ({ profile, onBack }) => {
+  const currentStreak = profile?.currentStreak || 0;
+  
+  const milestones = [
+    { days: 30, amount: 200, icon: <Wallet size={20} className="text-blue-500" /> },
+    { days: 60, amount: 500, icon: <Banknote size={20} className="text-green-500" /> },
+    { days: 90, amount: 999, icon: <Trophy size={20} className="text-yellow-500" /> }
+  ];
+
+  return (
+    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
+          <ArrowLeft size={18}/>
+        </button>
+        <h1 className="text-2xl font-black tracking-tight text-black">Cashout</h1>
+      </div>
+
+      <div className="bg-[#0A0A0A] text-white p-8 rounded-[40px] relative overflow-hidden shadow-2xl border border-white/5">
+         <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.5),transparent_70%)]" />
+         <div className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mb-4">CURRENT STREAK</div>
+         <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-white/10 rounded-3xl flex items-center justify-center border border-white/10 backdrop-blur-md">
+               <Flame size={32} className="text-orange-500 fill-orange-500" />
+            </div>
+            <div>
+               <div className="text-4xl font-black tracking-tighter">{currentStreak} Days</div>
+               <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-1">Metabolic Chain Active</div>
+            </div>
+         </div>
+         {profile?.upiId && (
+            <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
+               <div className="flex items-center gap-2">
+                  <Smartphone size={12} className="text-gray-500"/>
+                  <span className="text-[9px] font-black text-gray-400 uppercase">{profile.upiId}</span>
+               </div>
+               <div className="text-[8px] font-black text-yellow-400 bg-white/5 px-2 py-1 rounded">Active Settlement</div>
+            </div>
+         )}
+      </div>
+
+      <div className="space-y-4">
+         <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Reward Milestones</h3>
+         {milestones.map((m, i) => {
+            const progress = Math.min((currentStreak / m.days) * 100, 100);
+            const isUnlocked = currentStreak >= m.days;
+            return (
+              <div key={i} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
+                 <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                       <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shadow-inner">
+                          {m.icon}
+                       </div>
+                       <div>
+                          <div className="text-sm font-black tracking-tight">₹{m.amount} Reward</div>
+                          <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{m.days} Day Milestone</div>
+                       </div>
+                    </div>
+                    {isUnlocked ? (
+                      <div className="bg-green-50 text-green-500 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1">
+                        <CheckCircle2 size={10}/> Available
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 text-gray-400 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">
+                        {m.days - currentStreak} Days Left
+                      </div>
+                    )}
+                 </div>
+                 <div className="w-full h-2 bg-gray-50 rounded-full overflow-hidden">
+                    <div 
+                       className={`h-full transition-all duration-1000 ease-out ${isUnlocked ? 'bg-green-500' : 'bg-black'}`} 
+                       style={{ width: `${progress}%` }} 
+                    />
+                 </div>
+              </div>
+            );
+         })}
+      </div>
+
+      <div className="bg-yellow-50 p-6 rounded-[32px] border border-yellow-100">
+         <div className="flex gap-4 items-start">
+            <Info className="text-yellow-600 shrink-0" size={20} />
+            <div>
+               <p className="text-[11px] font-black text-yellow-800 uppercase tracking-tight mb-2">Protocol Rules:</p>
+               <p className="text-[10px] font-bold text-yellow-700/80 leading-relaxed uppercase">
+                 You must scan at least one meal every 24 hours to register your day. Skipping a scan for one day will reset your metabolic streak to zero. 
+               </p>
+               <p className="text-[9px] font-medium text-yellow-600 mt-2 italic">
+                 Rewards are credited to your Dr Foodie Vault upon verification of nodes.
+               </p>
+            </div>
+         </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Referral View Component ---
 const ReferralView: React.FC<{ profile: UserProfile | null; onBack: () => void }> = ({ profile, onBack }) => {
   const [copied, setCopied] = useState(false);
@@ -928,7 +1101,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [view, setView] = useState<'home' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team' | 'wallet' | 'refer' | 'admin_users' | 'admin_user_edit' | 'admin_payments' | 'admin_transfers' | 'admin_dashboard' | 'workout_unlock' | 'workout_location' | 'workout_focus' | 'workout_plan' | 'update_profile'>('home');
+  const [view, setView] = useState<'home' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team' | 'wallet' | 'refer' | 'cashout' | 'upi_entry' | 'admin_users' | 'admin_user_edit' | 'admin_payments' | 'admin_transfers' | 'admin_dashboard' | 'workout_unlock' | 'workout_location' | 'workout_focus' | 'workout_plan' | 'update_profile'>('home');
   const [scans, setScans] = useState<(ScanHistoryItem & { isPending?: boolean; hasError?: boolean })[]>([]);
   const [showPremium, setShowPremium] = useState(false);
   const [analysis, setAnalysis] = useState<ScanHistoryItem | null>(null);
@@ -1251,6 +1424,18 @@ const App: React.FC = () => {
     } catch (e) { alert("Vault node unreachable."); }
   };
 
+  const handleSaveUpi = async (upiId: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, "profiles", user.uid), { upiId });
+      setProfile(prev => prev ? { ...prev, upiId } : null);
+      setView('cashout');
+      alert("Terminal node synced successfully.");
+    } catch (e) {
+      alert("Terminal sync failed.");
+    }
+  };
+
   const adminUpdateUser = async (uid: string, data: Partial<UserProfile>) => {
     try {
       await updateDoc(doc(db, "profiles", uid), data);
@@ -1367,6 +1552,10 @@ const App: React.FC = () => {
                 <div className="space-y-2">
                    {[
                      { icon: <Edit3 size={18}/>, label: 'Update Metrics', action: () => setView('update_profile') },
+                     { icon: <Banknote size={18}/>, label: 'Cashout Rewards', action: () => {
+                        if (profile?.upiId) setView('cashout');
+                        else setView('upi_entry');
+                     }},
                      { icon: <WalletIcon size={18}/>, label: 'Vault Access', action: () => setView('wallet') },
                      { icon: <Gift size={18}/>, label: 'Referral Nodes', action: () => setView('refer') },
                      { icon: <Crown size={18}/>, label: 'Go Pro', action: () => setShowPremium(true), hidden: profile?.isPremium },
@@ -1390,6 +1579,8 @@ const App: React.FC = () => {
             {view === 'team' && <TeamSection onBack={() => setView('settings')} />}
             {view === 'wallet' && <WalletForm profile={profile} onTransfer={handleTransfer} onBack={() => setView('settings')} />}
             {view === 'refer' && <ReferralView profile={profile} onBack={() => setView('settings')} />}
+            {view === 'upi_entry' && <UPIEntryView onSave={handleSaveUpi} onBack={() => setView('settings')} />}
+            {view === 'cashout' && <CashoutView profile={profile} onBack={() => setView('settings')} />}
             {view === 'workout_unlock' && <UnlockWorkoutView currentGems={profile?.points || 0} isUnlocking={isUnlockingWorkout} onUnlock={handleUnlockWorkout} onGoToWallet={() => setView('wallet')} onBack={() => setView('home')} />}
             {view === 'workout_location' && <WorkoutLocationView onBack={() => setView('home')} onSelect={(loc) => { setSelectedLocation(loc); setView('workout_focus'); }} />}
             {view === 'workout_focus' && <WorkoutFocusView location={selectedLocation!} selectedGroups={selectedMuscleGroups} onToggle={(g)=>setSelectedMuscleGroups(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev, g])} onGenerate={handleGenerateWorkout} onBack={() => setView('workout_location')} />}
@@ -1404,7 +1595,7 @@ const App: React.FC = () => {
         <button onClick={()=>{ if (isAdmin) setView('admin_dashboard'); else if (profile?.isWorkoutUnlocked) setView('workout_location'); else setView('workout_unlock'); }} className={`transition-all ${view.startsWith('workout')?'text-black scale-110':'text-black/20'}`}>{isAdmin ? <DollarSign size={22}/> : <Dumbbell size={22}/>}</button>
         <div className="relative -mt-12 flex justify-center z-50"><button onClick={()=>{ if (isAdmin) setView('admin_users'); else startCamera(); }} className="w-16 h-16 bg-black rounded-full flex items-center justify-center text-white border-[6px] border-[#F2F2F7] shadow-2xl active:scale-90 transition-all">{isAdmin ? <Users size={24}/> : <Plus size={32}/>}</button></div>
         <button onClick={()=>{ if (!isAdmin) setView('stats'); }} className={`transition-all ${view==='stats'?'text-black scale-110':'text-black/20'}`}><BarChart2 size={22}/></button>
-        <button onClick={()=>setView('settings')} className={`transition-all ${view==='settings' || view === 'team' ?'text-black scale-110':'text-black/20'}`}><Settings size={22}/></button>
+        <button onClick={()=>setView('settings')} className={`transition-all ${view==='settings' || view === 'team' || view === 'cashout' || view === 'upi_entry' ?'text-black scale-110':'text-black/20'}`}><Settings size={22}/></button>
       </nav>
 
       {clarificationQuestion && pendingImage && <ClarificationModal question={clarificationQuestion} onAnswer={(ans) => processImage(pendingImage, ans)} onApprox={() => processImage(pendingImage, "Approximate")} onCancel={() => setClarificationQuestion(null)} />}
