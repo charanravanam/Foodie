@@ -19,6 +19,15 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
   const [loading, setLoading] = useState(false);
 
   const validateForm = () => {
+    // Allow 'admin' keyword to pass email validation
+    if (email.toLowerCase() === 'admin') {
+      if (password.length < 1) {
+        setError("Admin credentials required.");
+        return false;
+      }
+      return true;
+    }
+
     if (!email.includes('@')) {
       setError("Please enter a valid email address.");
       return false;
@@ -110,8 +119,8 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
               <input
-                type="email"
-                placeholder="Email Address"
+                type="text"
+                placeholder="Email or Username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[20px] border-none focus:ring-1 focus:ring-black font-bold transition-all shadow-inner text-sm"
