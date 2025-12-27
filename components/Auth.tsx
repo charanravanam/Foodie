@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { auth, db } from '../services/firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
 import { Mail, Lock, ArrowRight, Loader2, Gift, ShieldAlert, Key, HelpCircle, AlertCircle } from 'lucide-react';
 
 interface AuthProps {
@@ -19,17 +19,12 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
   const [loading, setLoading] = useState(false);
 
   const validateForm = () => {
-    // Basic format check for all inputs
     if (!email.includes('@')) {
-      setError("Please enter a valid email address (e.g., name@domain.com).");
+      setError("Please enter a valid email address.");
       return false;
     }
-    if (password.length < 1) {
-      setError("Password is required.");
-      return false;
-    }
-    if (!isLogin && password.length < 6) {
-      setError("Password must be at least 6 characters for new accounts.");
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
       return false;
     }
     return true;
@@ -39,8 +34,8 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
     e.preventDefault();
     setError(null);
     setMessage(null);
-    if (!email || !email.includes('@')) {
-      setError("Enter a valid email to receive reset link.");
+    if (!email) {
+      setError("Enter email to receive reset link.");
       return;
     }
     setLoading(true);
@@ -76,19 +71,34 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
+        
+        // Auto-send verification email
+        await sendEmailVerification(user);
+        
         if (referralCode.trim()) {
            localStorage.setItem(`pending_referral_${user.uid}`, referralCode.trim().toUpperCase());
         }
+        setMessage("Node established. Verification link dispatched to " + email);
       }
     } catch (err: any) {
-      console.error("Auth Error:", err.code, err.message);
+      console.error("Auth Error:", err.code);
       let msg = "Establishment failed. Try again.";
-      if (err.code === 'auth/wrong-password') msg = "Incorrect password.";
-      if (err.code === 'auth/user-not-found') msg = "No node found with this email.";
-      if (err.code === 'auth/email-already-in-use') msg = "Account already exists. Try logging in.";
-      if (err.code === 'auth/weak-password') msg = "Password is too weak.";
-      if (err.code === 'auth/invalid-email') msg = "Invalid email format.";
-      if (err.code === 'auth/network-request-failed') msg = "Network failure. Check your connection.";
+      
+      // Specific Error Handling as requested
+      if (err.code === 'auth/user-not-found') {
+        msg = "No account found with this email. Please create an account first.";
+      } else if (err.code === 'auth/wrong-password') {
+        msg = "Incorrect password. Please try again.";
+      } else if (err.code === 'auth/invalid-credential') {
+        msg = "Invalid credentials. If you don't have an account, please sign up first.";
+      } else if (err.code === 'auth/email-already-in-use') {
+        msg = "Account already exists with this ID. Please Log In.";
+      } else if (err.code === 'auth/weak-password') {
+        msg = "Encryption too weak. Use min 6 chars.";
+      } else if (err.code === 'auth/invalid-email') {
+        msg = "Email protocol invalid.";
+      }
+      
       setError(msg);
     } finally {
       setLoading(false);
@@ -98,15 +108,15 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white font-sans">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-xl transition-transform hover:scale-110">
-            {isForgotPassword ? <Key className="text-white" size={28} /> : <ShieldAlert className="text-white" size={28} />}
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-black rounded-[24px] flex items-center justify-center mx-auto mb-4 shadow-xl transition-transform hover:rotate-3 active:scale-90">
+             <ShieldAlert className="text-white" size={32} />
           </div>
-          <h1 className="text-xl font-black tracking-tight">
+          <h1 className="text-2xl font-black tracking-tight">
             {isForgotPassword ? 'Reset Access' : (isLogin ? 'Welcome Back' : 'Create Account')}
           </h1>
-          <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1.5">
-            {isForgotPassword ? 'Recover your terminal' : (isLogin ? 'Log in to your terminal' : 'Join the health network')}
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em] mt-2">
+            {isForgotPassword ? 'Recover Terminal' : (isLogin ? 'Log in to Terminal' : 'Join the Network')}
           </p>
         </div>
 
@@ -129,7 +139,7 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
                 <input
                   type="password"
-                  placeholder={isLogin ? "Password" : "Create password (min. 6 chars)"}
+                  placeholder={isLogin ? "Password" : "Min. 6 characters"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[20px] border-none focus:ring-1 focus:ring-black font-bold transition-all shadow-inner text-sm"
@@ -153,14 +163,14 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
           </div>
 
           {error && (
-            <div className="p-4 bg-red-50 text-red-600 rounded-2xl flex items-start gap-3 border border-red-100 animate-fade-in">
+            <div className="p-4 bg-red-50 text-red-600 rounded-2xl flex items-start gap-3 border border-red-100 animate-fade-in shadow-sm">
               <AlertCircle size={16} className="shrink-0 mt-0.5" />
               <p className="text-[11px] font-black uppercase tracking-tight leading-tight">{error}</p>
             </div>
           )}
           
           {message && (
-            <div className="p-4 bg-green-50 text-green-600 rounded-2xl flex items-start gap-3 border border-green-100 animate-fade-in">
+            <div className="p-4 bg-green-50 text-green-600 rounded-2xl flex items-start gap-3 border border-green-100 animate-fade-in shadow-sm">
               <Loader2 size={16} className="shrink-0 mt-0.5 animate-spin" />
               <p className="text-[11px] font-black uppercase tracking-tight leading-tight">{message}</p>
             </div>
@@ -169,35 +179,37 @@ const Auth: React.FC<AuthProps> = ({ onAdminLogin }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-black text-white py-4 rounded-[20px] font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 mt-2"
+            className="w-full bg-black text-white py-4 rounded-[20px] font-black text-sm shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 mt-4"
           >
-            {loading ? <Loader2 className="animate-spin" size={18} /> : (isForgotPassword ? 'SEND RECOVERY' : (isLogin ? 'LOG IN' : 'ESTABLISH NODE'))}
+            {loading ? <Loader2 className="animate-spin" size={20} /> : (isForgotPassword ? 'SEND RECOVERY' : (isLogin ? 'LOG IN' : 'ESTABLISH NODE'))}
           </button>
         </form>
 
-        <div className="mt-6 space-y-3 text-center">
+        <div className="mt-8 space-y-4 text-center">
           {isLogin && !isForgotPassword && (
             <button
               type="button"
               onClick={() => setIsForgotPassword(true)}
-              className="text-[9px] font-black text-gray-300 uppercase tracking-widest hover:text-black transition-colors flex items-center justify-center gap-1.5 mx-auto"
+              className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors"
             >
-              <HelpCircle size={10}/> Forgot Password?
+              Lost your access? Reset here
             </button>
           )}
           
-          <button
-            type="button"
-            onClick={() => {
-              setIsForgotPassword(false);
-              setIsLogin(!isLogin);
-              setError(null);
-              setMessage(null);
-            }}
-            className="text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-black transition-colors"
-          >
-            {isForgotPassword ? "Back to Login" : (isLogin ? "Need an account? Sign Up" : "Already have an account? Log In")}
-          </button>
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsForgotPassword(false);
+                setIsLogin(!isLogin);
+                setError(null);
+                setMessage(null);
+              }}
+              className="text-[10px] font-black text-black uppercase tracking-widest bg-gray-50 px-6 py-3 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              {isForgotPassword ? "Back to Login" : (isLogin ? "Join the Health Network" : "Log in to existing Node")}
+            </button>
+          </div>
         </div>
       </div>
     </div>

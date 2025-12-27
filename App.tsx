@@ -8,12 +8,13 @@ import {
   ShieldCheck, ShieldAlert, DollarSign, Search, History, Heart, 
   Mail, Key, Share, Sparkle, Ban, UserX, Gem, Lock, Zap as Lightning,
   Shield, Bell, HelpCircle, Info, ChevronDown, Image, MessageCircle, Trash2,
-  Edit3, CreditCard, Save, AlertCircle, Banknote, Wallet, Smartphone
+  Edit3, CreditCard, Save, AlertCircle, Banknote, Wallet, Smartphone,
+  RefreshCw
 } from 'lucide-react';
-import { onAuthStateChanged, signOut, sendPasswordResetEmail } from 'firebase/auth';
+import { onAuthStateChanged, signOut, sendPasswordResetEmail, sendEmailVerification, reload } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { 
-  doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc, deleteDoc, where, updateDoc, increment, onSnapshot, Timestamp, runTransaction
+  doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc, deleteDoc, where, updateDoc, increment, onSnapshot, Timestamp, runTransaction, limit
 } from 'firebase/firestore';
 import Onboarding from './components/Onboarding';
 import PremiumModal from './components/PremiumModal';
@@ -28,6 +29,7 @@ const WORKOUT_UNLOCK_COST = 500;
 const REFERRAL_BONUS_SENDER = 100;
 const REFERRAL_BONUS_RECEIVER = 50;
 const REFERRAL_BONUS_PREMIUM = 250;
+const GEM_VALUE_ESTIMATE = 8; // ₹8 per Gem
 
 const resizeImage = (base64Str: string, maxWidth = 1024, maxHeight = 1024): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -71,1037 +73,800 @@ const resizeImage = (base64Str: string, maxWidth = 1024, maxHeight = 1024): Prom
 
 const formatCoins = (num: number) => {
   if (num === undefined || num === null) return '0';
-  if (num < 100000) return num.toLocaleString();
-  if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-  return (num / 1000).toFixed(0) + 'k';
+  if (num < 1000) return num.toString();
+  if (num < 1000000) return (num / 1000).toFixed(1) + 'k';
+  return (num / 1000000).toFixed(1) + 'M';
 };
 
-// --- Sub-Components ---
+// --- Admin Sub-Components ---
 
-const PendingScanCard: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    const duration = 5000;
-    const intervalTime = 50;
-    const steps = duration / intervalTime;
-    const increment = 100 / steps;
-
-    const interval = setInterval(() => {
-      setProgress(prev => (prev >= 98 ? 98 : prev + increment));
-    }, intervalTime);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className="bg-white p-4 rounded-[30px] flex gap-4 shadow-card items-center border border-gray-50 relative overflow-hidden animate-fade-in">
-      <div className="w-14 h-14 rounded-2xl bg-gray-50 overflow-hidden shrink-0 border border-gray-100">
-        <img src={imageUrl} className="w-full h-full object-cover opacity-60" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="font-black text-sm tracking-tight text-gray-400">Processing Meal...</div>
-        <div className="text-[9px] text-black font-black uppercase tracking-widest mt-1 flex items-center gap-1.5">
-          <Loader2 size={10} className="animate-spin" /> Metabolic Density Scan
-        </div>
-      </div>
-      <div 
-        className="absolute bottom-0 left-0 h-1 bg-yellow-400 transition-all duration-300" 
-        style={{ width: `${progress}%` }} 
-      />
-    </div>
-  );
-};
-
-const WalletForm: React.FC<{
-  profile: UserProfile | null;
-  onTransfer: (code: string, coins: number) => Promise<void>;
-  onBack: () => void;
-}> = ({ profile, onTransfer, onBack }) => {
-  const [transferCode, setTransferCode] = useState('');
-  const [transferAmount, setTransferAmount] = useState('100');
-  const [isProcessingTransfer, setIsProcessingTransfer] = useState(false);
-
-  return (
-    <div className="pt-4 space-y-6 animate-fade-in pb-40 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
-          <ArrowLeft size={18}/>
-        </button>
-        <h1 className="text-2xl font-black tracking-tight text-black">Vault</h1>
-      </div>
-      
-      <div className="bg-[#0A0A0A] text-white p-8 rounded-[40px] text-center relative overflow-hidden shadow-2xl border border-white/5">
-         <div className="absolute top-0 left-0 w-full h-full opacity-30 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,rgba(255,215,0,0.15),transparent_70%)]" />
-         <div className="text-[9px] font-black uppercase text-gray-600 tracking-[0.4em] mb-3">TOTAL ASSETS</div>
-         <div className="flex items-center justify-center gap-2">
-            <div className="text-5xl font-black mb-1 bg-gradient-to-b from-white to-gray-500 bg-clip-text text-transparent tracking-tighter">
-              {formatCoins(profile?.points || 0)}
-            </div>
-            <Gem className="text-yellow-500 animate-pulse" size={24} />
-         </div>
-         <div className="text-[9px] font-black text-yellow-400 bg-white/5 py-2 px-4 rounded-full inline-block mt-3 uppercase tracking-[0.2em] border border-white/5 backdrop-blur-md">
-           USER ID: {profile?.uniqueTransferCode || 'Generating...'}
-         </div>
-      </div>
-
-      {profile?.upiId && (
-        <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Smartphone className="text-gray-300" size={18} />
-            <div>
-               <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Payout Node</div>
-               <div className="text-xs font-black tracking-tight">{profile.upiId}</div>
-            </div>
-          </div>
-          <div className="bg-green-50 text-green-500 px-2 py-1 rounded-md text-[8px] font-black uppercase">Verified</div>
-        </div>
-      )}
-
-      <div className="bg-white p-6 rounded-[36px] shadow-card border border-gray-100 space-y-4">
-        <div className="flex items-center gap-2 px-1">
-          <Zap size={14} className="text-yellow-500 fill-yellow-500" />
-          <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Earning Protocol</h3>
-        </div>
-        <div className="grid grid-cols-1 gap-2">
-          {[
-            { label: 'Metabolic Scan', desc: 'Per successful scan', reward: '+5 Gems', icon: <Camera size={18} /> },
-            { label: 'Node Expansion', desc: 'Per referral join', reward: '+100 Gems', icon: <Users size={18} /> },
-            { label: 'Premium Upgrade', desc: 'Referral goes Pro', reward: '+250 Gems', icon: <Crown size={18} /> }
-          ].map((item, i) => (
-            <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-[20px]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-black">
-                  {item.icon}
-                </div>
-                <div>
-                  <div className="text-[11px] font-black leading-none">{item.label}</div>
-                  <div className="text-[8px] text-gray-400 font-bold uppercase mt-1">{item.desc}</div>
-                </div>
-              </div>
-              <div className="text-xs font-black text-yellow-600 bg-yellow-50 px-3 py-1.5 rounded-full border border-yellow-100">{item.reward}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-gradient-to-br from-yellow-400 to-yellow-600 p-8 rounded-[40px] shadow-[0_15px_40px_rgba(234,179,8,0.2)] relative overflow-hidden group">
-         <div className="absolute -right-8 -bottom-8 opacity-20 group-hover:scale-110 transition-transform duration-700">
-            <Lightning size={120} className="text-white fill-white" />
-         </div>
-         <div className="relative z-10 space-y-3">
-            <div className="flex items-center gap-2">
-               <div className="bg-black text-white px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">PHASE 1: EARN</div>
-            </div>
-            <h2 className="text-2xl font-black text-black leading-tight tracking-tighter uppercase">The Great Airdrop</h2>
-            <div className="space-y-2">
-              <p className="text-black/90 text-xs font-bold leading-tight">
-                Exclusive <span className="underline decoration-black/30 underline-offset-4">Airdrop</span> launching soon.
-              </p>
-              <p className="text-black/80 text-[12px] font-medium leading-tight">
-                Convert coins into <span className="font-black">Real Money</span> at the reveal.
-              </p>
-            </div>
-         </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-[36px] shadow-card border border-gray-100 space-y-4">
-         <div className="flex justify-between items-center">
-            <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 px-1"><Send size={12}/> Peer Transfer</h3>
-            <div className="text-[8px] font-black text-green-500 bg-green-50 px-2 py-1 rounded-md uppercase">Zero Fee</div>
-         </div>
-         <div className="space-y-3">
-            <input 
-              type="text" 
-              placeholder="Unique Code (INR-XXXXXX)" 
-              value={transferCode} 
-              onChange={(e) => setTransferCode(e.target.value.toUpperCase())}
-              className="w-full p-4 rounded-xl bg-gray-50 border-none font-bold text-sm shadow-inner"
-            />
-            <input 
-              type="number" 
-              placeholder="Amount (Coins)" 
-              value={transferAmount} 
-              onChange={(e) => setTransferAmount(e.target.value)}
-              className="w-full p-4 rounded-xl bg-gray-50 border-none font-bold text-sm shadow-inner"
-            />
-            <button 
-              onClick={async () => {
-                setIsProcessingTransfer(true);
-                try { await onTransfer(transferCode, parseInt(transferAmount) || 0); setTransferCode(''); setTransferAmount('100'); }
-                finally { setIsProcessingTransfer(false); }
-              }}
-              disabled={isProcessingTransfer}
-              className="w-full bg-black text-white py-4 rounded-[18px] font-black text-xs active:scale-95 transition-all disabled:opacity-50 shadow-lg"
-            >
-              {isProcessingTransfer ? <Loader2 className="animate-spin mx-auto" size={16}/> : "Authorize Transfer"}
-            </button>
-         </div>
-      </div>
-    </div>
-  );
-};
-
-const StatsView: React.FC<{ scans: ScanHistoryItem[]; currentCalTarget: number; profile: UserProfile | null; onBack: () => void }> = ({ scans, currentCalTarget, profile, onBack }) => {
-  const chartData = useMemo(() => {
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      return d.toDateString();
-    }).reverse();
-    
-    return last7Days.map(date => {
-      const dayScans = scans.filter(s => new Date(s.timestamp).toDateString() === date);
-      const total = dayScans.reduce((acc, s) => acc + (s.calories || 0), 0);
-      return { 
-        name: date.split(' ')[0], 
-        calories: total
-      };
-    });
-  }, [scans]);
-
-  return (
-    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
-          <ArrowLeft size={18}/>
-        </button>
-        <h1 className="text-2xl font-black tracking-tight text-black">Insights</h1>
-      </div>
-
-      <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-6">
-         <div className="flex justify-between items-center">
-           <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] px-1">Calorie Trend</h3>
-           <div className="bg-black text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">Metabolism</div>
-         </div>
-         
-         <div className="h-48 w-full flex items-end justify-between gap-2 px-1">
-            {chartData.map((d, i) => {
-              const maxCal = Math.max(...chartData.map(cd => cd.calories), currentCalTarget);
-              const height = d.calories === 0 ? 8 : (d.calories / maxCal) * 100;
-              const isOverTarget = d.calories > currentCalTarget;
-              
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-3">
-                  <div className="w-full bg-gray-50 rounded-2xl relative overflow-hidden group h-32">
-                     <div 
-                       className={`absolute bottom-0 left-0 right-0 transition-all duration-700 ease-out rounded-t-lg ${isOverTarget ? 'bg-orange-500' : 'bg-black'}`} 
-                       style={{ height: `${height}%` }} 
-                     />
-                  </div>
-                  <span className="text-[8px] font-black text-gray-400 uppercase">{d.name}</span>
-                </div>
-              );
-            })}
-         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-         <div className="bg-white p-6 rounded-[32px] border border-gray-50 shadow-card text-center">
-            <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-2">Avg. Health</div>
-            <div className="text-3xl font-black tracking-tighter">
-              {scans.length > 0 ? (scans.reduce((acc, s) => acc + (s.healthScore || 0), 0) / scans.length).toFixed(1) : '0.0'}
-            </div>
-         </div>
-         <div className="bg-white p-6 rounded-[32px] border border-gray-50 shadow-card text-center">
-            <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-2">Total Scans</div>
-            <div className="text-3xl font-black tracking-tighter">{scans.length}</div>
-         </div>
-      </div>
-    </div>
-  );
-};
-
-const AdminPanel: React.FC<{
-  view: string;
-  setView: (v: any) => void;
-  allUsers: any[];
-  allPayments: any[];
-  allTransfers: any[];
-  adminSearch: string;
-  setAdminSearch: (v: string) => void;
-  setIsAdmin: (v: boolean) => void;
-  onUpdateUser: (uid: string, data: Partial<UserProfile>) => Promise<void>;
-}> = ({ view, setView, allUsers, allPayments, allTransfers, adminSearch, setAdminSearch, setIsAdmin, onUpdateUser }) => {
-  const [selectedUser, setSelectedUser] = useState<any | null>(null);
-  const [editCoins, setEditCoins] = useState('');
-  const [editPremium, setEditPremium] = useState(false);
+const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
+  const [adminTab, setAdminTab] = useState<'home' | 'transactions' | 'nodes' | 'stats' | 'settings'>('home');
+  const [adminSubView, setAdminSubView] = useState<'none' | 'edit_node' | 'peer_transfers'>('none');
+  
+  const [users, setUsers] = useState<(UserProfile & { id: string })[]>([]);
+  const [transfers, setTransfers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedUser, setSelectedUser] = useState<(UserProfile & { id: string }) | null>(null);
+  
+  const [editGems, setEditGems] = useState('0');
+  const [editPro, setEditPro] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const filteredUsers = allUsers.filter(u => 
-    u.name?.toLowerCase().includes(adminSearch.toLowerCase()) || 
-    u.email?.toLowerCase().includes(adminSearch.toLowerCase()) ||
-    u.uniqueTransferCode?.toLowerCase().includes(adminSearch.toLowerCase())
-  );
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      try {
+        const uSnap = await getDocs(query(collection(db, "profiles"), limit(200)));
+        const uList: (UserProfile & { id: string })[] = [];
+        uSnap.forEach(d => uList.push({ id: d.id, ...d.data() } as any));
+        setUsers(uList);
 
-  const totalCoinsInCirculation = useMemo(() => {
-    return allUsers.reduce((acc, u) => acc + (u.points || 0), 0);
-  }, [allUsers]);
+        const tSnap = await getDocs(query(collection(db, "transfers"), orderBy("timestamp", "desc"), limit(50)));
+        const tList: any[] = [];
+        tSnap.forEach(d => tList.push({ id: d.id, ...d.data() }));
+        setTransfers(tList);
+      } catch (e) {
+        console.error("Failed to fetch administrative data", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAdminData();
+  }, []);
 
-  const handleEditUser = (user: any) => {
-    setSelectedUser(user);
-    setEditCoins(user.points?.toString() || '0');
-    setEditPremium(user.isPremium || false);
-    setView('admin_user_edit');
+  const totalGems = users.reduce((acc, u) => acc + (u.points || 0), 0);
+  const stats = {
+    total: users.length,
+    premium: users.filter(u => u.isPremium).length,
+    gems: totalGems
   };
 
-  const saveUserChanges = async () => {
+  const filteredUsers = users.filter(u => 
+    u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.uniqueTransferCode?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleUpdateNode = async () => {
     if (!selectedUser) return;
     setIsUpdating(true);
     try {
-      await onUpdateUser(selectedUser.uid, {
-        points: parseInt(editCoins) || 0,
-        isPremium: editPremium
-      });
-      setView('admin_users');
+      const updatedData = {
+        points: parseInt(editGems) || 0,
+        isPremium: editPro
+      };
+      await updateDoc(doc(db, "profiles", selectedUser.id), updatedData);
+      setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, ...updatedData } : u));
+      alert("Node metrics deployed successfully.");
+      setAdminSubView('none');
+      setAdminTab('nodes');
     } catch (e) {
-      alert("Node update failed.");
+      alert("Deployment failed.");
     } finally {
       setIsUpdating(false);
     }
   };
 
-  return (
-    <div className="h-full flex flex-col bg-white overflow-hidden">
-      <header className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
-        <div><h1 className="text-xl font-black tracking-tight">Admin Console</h1><p className="text-[8px] font-black text-red-500 uppercase tracking-widest">Restricted Access</p></div>
-        <button onClick={() => { localStorage.removeItem('drfoodie_admin'); setIsAdmin(false); setView('home'); }} className="p-3 bg-gray-50 rounded-xl text-gray-400 active:scale-95 transition-all"><LogOut size={18}/></button>
-      </header>
+  const renderHeader = (title: string, showBack = false, customBackAction?: () => void) => (
+    <div className="flex justify-between items-center mb-8 px-2 pt-4">
+      <div className="flex items-center gap-4">
+        {showBack && (
+          <button 
+            onClick={customBackAction || (() => setAdminSubView('none'))} 
+            className="p-3 bg-white rounded-2xl shadow-sm border border-gray-50 active:scale-90 transition-all"
+          >
+            <ArrowLeft size={18} />
+          </button>
+        )}
+        <div>
+          <h1 className="text-3xl font-black tracking-tight leading-none">{title}</h1>
+          <p className="text-[10px] font-black text-red-500 uppercase tracking-[0.2em] mt-1.5">RESTRICTED ACCESS</p>
+        </div>
+      </div>
+      {!showBack && (
+        <button onClick={onLogout} className="p-4 bg-[#F8F9FA] text-gray-400 rounded-[20px] active:scale-90 transition-all border border-gray-100">
+          <LogOut size={20} />
+        </button>
+      )}
+    </div>
+  );
+
+  // --- Views ---
+
+  const HomeView = (
+    <div className="space-y-6 animate-fade-in">
+      {renderHeader("Admin Console")}
       
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-32 no-scrollbar">
-        {view === 'admin_dashboard' && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-black p-6 rounded-[32px] text-white">
-                 <div className="text-[8px] font-black text-gray-500 uppercase mb-2">Active Nodes</div>
-                 <div className="text-3xl font-black tracking-tighter">{allUsers.length}</div>
-              </div>
-              <div className="bg-gray-50 p-6 rounded-[32px] border border-gray-100">
-                 <div className="text-[8px] font-black text-gray-400 uppercase mb-2">Pro Users</div>
-                 <div className="text-3xl font-black text-black tracking-tighter">{allUsers.filter(u => u.isPremium).length}</div>
-              </div>
-            </div>
-            
-            <div className="bg-yellow-50 p-8 rounded-[40px] border border-yellow-100 text-center space-y-2 relative overflow-hidden group hover:bg-yellow-100 transition-all">
-               <div className="absolute top-0 left-0 w-full h-full opacity-5 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,rgba(234,179,8,0.3),transparent_70%)]" />
-               <div className="text-[8px] font-black text-yellow-600 uppercase tracking-widest">Gems in Circulation</div>
-               <div className="flex items-center justify-center gap-3">
-                  <div className="text-4xl font-black text-yellow-700 tracking-tighter">{formatCoins(totalCoinsInCirculation)}</div>
-                  <Gem size={24} className="text-yellow-500 animate-pulse" />
-               </div>
-            </div>
-
-            <div className="space-y-3">
-               <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Global Controls</h3>
-               <div className="grid grid-cols-1 gap-2">
-                 <button onClick={() => setView('admin_users')} className="bg-white p-5 rounded-[24px] border border-gray-100 flex justify-between items-center active:scale-95 transition-all">
-                    <div className="flex items-center gap-3"><Users size={18} className="text-gray-400"/><span className="text-sm font-black">Node Database</span></div>
-                    <ChevronRight size={16} className="text-gray-200" />
-                 </button>
-                 <button onClick={() => setView('admin_payments')} className="bg-white p-5 rounded-[24px] border border-gray-100 flex justify-between items-center active:scale-95 transition-all">
-                    <div className="flex items-center gap-3"><DollarSign size={18} className="text-gray-400"/><span className="text-sm font-black">Transactions</span></div>
-                    <ChevronRight size={16} className="text-gray-200" />
-                 </button>
-                 <button onClick={() => setView('admin_transfers')} className="bg-white p-5 rounded-[24px] border border-gray-100 flex justify-between items-center active:scale-95 transition-all">
-                    <div className="flex items-center gap-3"><Send size={18} className="text-gray-400"/><span className="text-sm font-black">Peer Transfers</span></div>
-                    <ChevronRight size={16} className="text-gray-200" />
-                 </button>
-               </div>
-            </div>
-          </div>
-        )}
-
-        {view === 'admin_users' && (
-           <div className="space-y-4 animate-fade-in">
-             <div className="flex items-center gap-3 mb-2">
-               <button onClick={() => setView('admin_dashboard')} className="p-2 bg-gray-50 rounded-lg"><ArrowLeft size={16}/></button>
-               <h2 className="text-lg font-black tracking-tight">Node Database</h2>
-             </div>
-             <div className="relative">
-               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
-               <input type="text" placeholder="Search nodes..." value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border-none font-bold text-sm shadow-inner" />
-             </div>
-             <div className="space-y-2">
-               {filteredUsers.map((u: any) => (
-                 <div key={u.uid} onClick={() => handleEditUser(u)} className="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center active:bg-gray-50 cursor-pointer transition-colors">
-                   <div>
-                     <div className="font-black text-sm">{u.name || 'Anonymous Agent'}</div>
-                     <div className="text-[9px] text-gray-400 font-bold uppercase">{u.email}</div>
-                     <div className="text-[7px] text-gray-300 font-bold uppercase tracking-widest mt-0.5">{u.uniqueTransferCode}</div>
-                     <div className="text-[8px] font-black text-blue-500 uppercase tracking-widest mt-1 flex items-center gap-1"><Gem size={8}/> {formatCoins(u.points || 0)}</div>
-                   </div>
-                   <div className="flex flex-col items-end gap-2">
-                      <div className={`px-2 py-1 rounded-md text-[8px] font-black uppercase ${u.isPremium ? 'bg-black text-yellow-400' : 'bg-gray-50 text-gray-400'}`}>
-                        {u.isPremium ? 'PRO' : 'FREE'}
-                      </div>
-                      <ChevronRight size={14} className="text-gray-200" />
-                   </div>
-                 </div>
-               ))}
-             </div>
-           </div>
-        )}
-
-        {view === 'admin_user_edit' && selectedUser && (
-           <div className="space-y-6 animate-fade-in">
-             <div className="flex items-center gap-3 mb-2">
-               <button onClick={() => setView('admin_users')} className="p-2 bg-gray-50 rounded-lg"><ArrowLeft size={16}/></button>
-               <h2 className="text-lg font-black tracking-tight">Edit Node</h2>
-             </div>
-             
-             <div className="bg-gray-50 p-6 rounded-[32px] border border-gray-100 space-y-1">
-                <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest">AGENT IDENTITY</div>
-                <div className="text-xl font-black">{selectedUser.name || 'Anonymous'}</div>
-                <div className="text-[10px] text-gray-500 font-bold">{selectedUser.email}</div>
-             </div>
-
-             <div className="space-y-4">
-               <div>
-                  <label className="block text-[8px] font-black uppercase text-gray-400 mb-2 tracking-widest px-1">Gems Balance</label>
-                  <div className="relative">
-                    <Gem className="absolute left-4 top-1/2 -translate-y-1/2 text-yellow-500" size={18} />
-                    <input 
-                      type="number" 
-                      value={editCoins} 
-                      onChange={(e) => setEditCoins(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-[20px] border-none font-black text-lg shadow-inner focus:ring-1 focus:ring-black"
-                    />
-                  </div>
-               </div>
-
-               <div className="bg-white p-5 rounded-[28px] border border-gray-100 flex items-center justify-between shadow-sm">
-                  <div className="flex items-center gap-4">
-                     <Crown className={editPremium ? 'text-yellow-500' : 'text-gray-300'} size={20} />
-                     <span className="text-sm font-black">Pro Status</span>
-                  </div>
-                  <button 
-                    onClick={() => setEditPremium(!editPremium)}
-                    className={`w-14 h-8 rounded-full relative transition-all duration-300 p-1 ${editPremium ? 'bg-black' : 'bg-gray-200'}`}
-                  >
-                     <div className={`w-6 h-6 bg-white rounded-full shadow-sm transition-all duration-300 ${editPremium ? 'translate-x-6' : 'translate-x-0'}`} />
-                  </button>
-               </div>
-             </div>
-
-             <button 
-               onClick={saveUserChanges}
-               disabled={isUpdating}
-               className="w-full bg-black text-white py-5 rounded-[24px] font-black text-sm shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
-             >
-               {isUpdating ? <Loader2 className="animate-spin" size={20}/> : <><Save size={20}/> Deploy Updates</>}
-             </button>
-           </div>
-        )}
-
-        {(view === 'admin_payments' || view === 'admin_transfers') && (
-           <div className="space-y-4 animate-fade-in">
-             <div className="flex items-center gap-3 mb-2">
-               <button onClick={() => setView('admin_dashboard')} className="p-2 bg-gray-50 rounded-lg"><ArrowLeft size={16}/></button>
-               <h2 className="text-lg font-black tracking-tight">{view === 'admin_payments' ? 'Transactions' : 'Peer Transfers'}</h2>
-             </div>
-             <div className="space-y-2">
-               {(view === 'admin_payments' ? allPayments : allTransfers).map((item: any) => (
-                 <div key={item.id} className="bg-white p-4 rounded-2xl border border-gray-100">
-                    <div className="flex justify-between items-start">
-                       <div>
-                         <div className="text-[10px] font-black">{item.userName || item.senderName || 'Unknown Agent'}</div>
-                         <div className="text-[8px] text-gray-400 font-bold uppercase">{new Date(item.timestamp?.seconds * 1000 || Date.now()).toLocaleString()}</div>
-                       </div>
-                       <div className="text-right">
-                          <div className="text-sm font-black tracking-tight">{item.amount ? `₹${item.amount}` : `${item.coins || 0} Gem`}</div>
-                          {item.recipientCode && <div className="text-[7px] font-bold text-blue-500 uppercase tracking-widest mt-0.5">TO: {item.recipientCode}</div>}
-                       </div>
-                    </div>
-                 </div>
-               ))}
-             </div>
-           </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const TeamSection: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  return (
-    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
-          <ArrowLeft size={18}/>
-        </button>
-        <h1 className="text-3xl font-black tracking-tight text-black">The Team</h1>
-      </div>
-
-      <div className="space-y-8 mt-4">
-        {/* Founder Card */}
-        <div className="bg-black text-white p-10 rounded-[45px] relative overflow-hidden shadow-2xl transition-transform hover:scale-[1.02] active:scale-100">
-           <div className="absolute top-6 right-8 opacity-20 pointer-events-none">
-              <Crown size={80} className="text-white" strokeWidth={1} />
-           </div>
-           <div className="relative z-10 space-y-2">
-              <div className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em]">FOUNDER</div>
-              <h2 className="text-4xl font-black tracking-tighter leading-tight">Charan Ravanam</h2>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Founder and CEO</p>
-           </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-black text-white p-10 rounded-[48px] flex flex-col justify-between aspect-[1.1/1]">
+          <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">ACTIVE NODES</div>
+          <div className="text-6xl font-black tracking-tighter">{stats.total}</div>
         </div>
-
-        <div className="bg-white rounded-[45px] p-8 shadow-card border border-gray-50 space-y-6">
-           <div className="flex items-center gap-3">
-              <Users size={18} className="text-gray-300" />
-              <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">CORE TEAM MEMBERS</div>
-           </div>
-
-           <div className="space-y-4">
-              {[
-                { name: 'Kranthi Madireddy', role: 'Core Team Member' },
-                { name: 'Gagan Adithya Reddy', role: 'Core Team Member' }
-              ].map((member, i) => (
-                <div key={i} className="bg-gray-50/50 p-6 rounded-[32px] border border-gray-100 flex items-center gap-5 group transition-all hover:bg-white hover:shadow-sm">
-                   <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center font-black text-xl shadow-sm border border-gray-100 group-hover:scale-110 transition-transform">
-                     {member.name.charAt(0)}
-                   </div>
-                   <div className="text-left">
-                     <div className="text-base font-black tracking-tight leading-tight">{member.name}</div>
-                     <div className="text-[8px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">{member.role}</div>
-                   </div>
-                </div>
-              ))}
-           </div>
+        <div className="bg-[#F8F9FA] p-10 rounded-[48px] flex flex-col justify-between aspect-[1.1/1] border border-gray-100">
+          <div className="text-[10px] font-black text-gray-300 uppercase tracking-widest">PRO USERS</div>
+          <div className="text-6xl font-black tracking-tighter">{stats.premium}</div>
         </div>
       </div>
-    </div>
-  );
-};
 
-// --- UPI Entry View Component ---
-const UPIEntryView: React.FC<{ 
-  onSave: (upiId: string) => Promise<void>; 
-  onBack: () => void 
-}> = ({ onSave, onBack }) => {
-  const [upi, setUpi] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleSave = async () => {
-    if (!upi.includes('@')) {
-      alert("Invalid UPI format. Missing '@' node.");
-      return;
-    }
-    setIsSaving(true);
-    try {
-      await onSave(upi);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
-          <ArrowLeft size={18}/>
-        </button>
-        <h1 className="text-2xl font-black tracking-tight text-black">Payout Node</h1>
+      <div className="bg-[#FFFCEB] p-10 rounded-[48px] border border-[#FFF9DB] text-center shadow-sm relative overflow-hidden">
+        <div className="text-[10px] font-black text-[#8A7100] uppercase tracking-widest mb-4">GEMS IN CIRCULATION</div>
+        <div className="flex items-center justify-center gap-3">
+          <span className="text-6xl font-black tracking-tighter text-[#A18400]">{formatCoins(stats.gems)}</span>
+          <Gem className="text-[#A18400] fill-[#A18400]" size={36} />
+        </div>
       </div>
 
-      <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-6 text-center">
-         <div className="w-16 h-16 bg-blue-50 rounded-[24px] flex items-center justify-center mx-auto shadow-inner">
-            <Smartphone className="text-blue-500" size={32} />
-         </div>
-         <div className="space-y-2">
-            <h2 className="text-xl font-black tracking-tight uppercase">Establish Uplink</h2>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed px-4">
-              Enter your UPI ID to authorize metabolic reward transfers. This will be your primary settlement terminal.
-            </p>
-         </div>
-
-         <div className="space-y-4">
-            <input 
-              type="text" 
-              placeholder="agent@bank" 
-              value={upi} 
-              onChange={(e) => setUpi(e.target.value.toLowerCase())}
-              className="w-full p-5 rounded-2xl bg-gray-50 border-none font-bold text-center text-sm shadow-inner focus:ring-1 focus:ring-black"
-            />
-            <button 
-              onClick={handleSave}
-              disabled={isSaving || !upi}
-              className="w-full bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-30"
-            >
-              {isSaving ? <Loader2 className="animate-spin mx-auto" size={16}/> : "Sync Terminal"}
-            </button>
-         </div>
+      <div className="space-y-4 pt-4">
+        <h3 className="text-[11px] font-black text-gray-300 uppercase tracking-[0.3em] px-2">GLOBAL CONTROLS</h3>
+        {[
+          { icon: <Users size={22} className="text-gray-200"/>, label: 'Node Database', action: () => setAdminTab('nodes') },
+          { icon: <DollarSign size={22} className="text-gray-200"/>, label: 'Transactions', action: () => setAdminTab('transactions') },
+          { icon: <Send size={22} className="text-gray-200 rotate-[-15deg]"/>, label: 'Peer Transfers', action: () => setAdminSubView('peer_transfers') }
+        ].map((ctrl, i) => (
+          <button 
+            key={i} 
+            onClick={ctrl.action}
+            className="w-full bg-white p-8 rounded-[32px] border border-gray-50 flex items-center justify-between shadow-sm active:scale-[0.98] transition-all"
+          >
+            <div className="flex items-center gap-6">
+              {ctrl.icon}
+              <span className="text-xl font-black tracking-tight">{ctrl.label}</span>
+            </div>
+            <ChevronRight size={20} className="text-gray-100" />
+          </button>
+        ))}
       </div>
     </div>
   );
-};
 
-// --- Cashout View Component ---
-const CashoutView: React.FC<{ profile: UserProfile | null; onBack: () => void }> = ({ profile, onBack }) => {
-  const currentStreak = profile?.currentStreak || 0;
-  
-  const milestones = [
-    { days: 30, amount: 200, icon: <Wallet size={20} className="text-blue-500" /> },
-    { days: 60, amount: 500, icon: <Banknote size={20} className="text-green-500" /> },
-    { days: 90, amount: 999, icon: <Trophy size={20} className="text-yellow-500" /> }
-  ];
-
-  return (
-    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
-          <ArrowLeft size={18}/>
-        </button>
-        <h1 className="text-2xl font-black tracking-tight text-black">Cashout</h1>
-      </div>
-
-      <div className="bg-[#0A0A0A] text-white p-8 rounded-[40px] relative overflow-hidden shadow-2xl border border-white/5">
-         <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.5),transparent_70%)]" />
-         <div className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mb-4">CURRENT STREAK</div>
-         <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white/10 rounded-3xl flex items-center justify-center border border-white/10 backdrop-blur-md">
-               <Flame size={32} className="text-orange-500 fill-orange-500" />
-            </div>
-            <div>
-               <div className="text-4xl font-black tracking-tighter">{currentStreak} Days</div>
-               <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-1">Metabolic Chain Active</div>
-            </div>
-         </div>
-         {profile?.upiId && (
-            <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
-               <div className="flex items-center gap-2">
-                  <Smartphone size={12} className="text-gray-500"/>
-                  <span className="text-[9px] font-black text-gray-400 uppercase">{profile.upiId}</span>
-               </div>
-               <div className="text-[8px] font-black text-yellow-400 bg-white/5 px-2 py-1 rounded">Active Settlement</div>
-            </div>
-         )}
+  const NodesView = (
+    <div className="space-y-6 animate-fade-in">
+      {renderHeader("Node Database", adminTab !== 'nodes', () => setAdminTab('home'))}
+      
+      <div className="relative mb-6">
+        <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={20} />
+        <input 
+          value={searchTerm} 
+          onChange={e => setSearchTerm(e.target.value)}
+          placeholder="Search nodes..." 
+          className="w-full pl-16 pr-6 py-6 bg-[#F8F9FA] rounded-[28px] border-none font-bold text-base shadow-inner"
+        />
       </div>
 
       <div className="space-y-4">
-         <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Reward Milestones</h3>
-         {milestones.map((m, i) => {
-            const progress = Math.min((currentStreak / m.days) * 100, 100);
-            const isUnlocked = currentStreak >= m.days;
-            return (
-              <div key={i} className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
-                 <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                       <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shadow-inner">
-                          {m.icon}
-                       </div>
-                       <div>
-                          <div className="text-sm font-black tracking-tight">₹{m.amount} Reward</div>
-                          <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{m.days} Day Milestone</div>
-                       </div>
-                    </div>
-                    {isUnlocked ? (
-                      <div className="bg-green-50 text-green-500 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1">
-                        <CheckCircle2 size={10}/> Available
-                      </div>
-                    ) : (
-                      <div className="bg-gray-50 text-gray-400 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">
-                        {m.days - currentStreak} Days Left
-                      </div>
-                    )}
-                 </div>
-                 <div className="w-full h-2 bg-gray-50 rounded-full overflow-hidden">
-                    <div 
-                       className={`h-full transition-all duration-1000 ease-out ${isUnlocked ? 'bg-green-500' : 'bg-black'}`} 
-                       style={{ width: `${progress}%` }} 
-                    />
-                 </div>
+        {filteredUsers.map((u, i) => (
+          <button 
+            key={i} 
+            onClick={() => { setSelectedUser(u); setEditGems((u.points || 0).toString()); setEditPro(!!u.isPremium); setAdminSubView('edit_node'); }}
+            className="w-full bg-white p-8 rounded-[32px] border border-gray-50 text-left shadow-sm active:scale-[0.98] transition-all relative"
+          >
+            <div className="flex justify-between items-start mb-2">
+              <h4 className="text-xl font-black tracking-tight">{u.name || 'Anonymous Agent'}</h4>
+              <div className={`px-4 py-1.5 rounded-xl text-[9px] font-black tracking-widest uppercase ${u.isPremium ? 'bg-black text-yellow-400' : 'bg-gray-100 text-gray-400'}`}>
+                {u.isPremium ? 'PRO' : 'FREE'}
               </div>
-            );
-         })}
-      </div>
-
-      <div className="bg-yellow-50 p-6 rounded-[32px] border border-yellow-100">
-         <div className="flex gap-4 items-start">
-            <Info className="text-yellow-600 shrink-0" size={20} />
-            <div>
-               <p className="text-[11px] font-black text-yellow-800 uppercase tracking-tight mb-2">Protocol Rules:</p>
-               <p className="text-[10px] font-bold text-yellow-700/80 leading-relaxed uppercase">
-                 You must scan at least one meal every 24 hours to register your day. Skipping a scan for one day will reset your metabolic streak to zero. 
-               </p>
-               <p className="text-[9px] font-medium text-yellow-600 mt-2 italic">
-                 Rewards are credited to your Dr Foodie Vault upon verification of nodes.
-               </p>
             </div>
-         </div>
+            <div className="text-[11px] font-bold text-gray-400 uppercase tracking-tight mb-2 truncate max-w-[85%]">{u.email}</div>
+            <div className="text-[10px] font-black text-gray-200 uppercase tracking-widest mb-4">{u.uniqueTransferCode}</div>
+            <div className="flex items-center gap-2 text-[#3F51B5]">
+              <Gem size={16} className="fill-[#3F51B5]" />
+              <span className="text-lg font-black">{u.points || 0}</span>
+            </div>
+            <ChevronRight size={20} className="absolute right-8 bottom-10 text-gray-100" />
+          </button>
+        ))}
       </div>
     </div>
   );
-};
 
-// --- Referral View Component ---
-const ReferralView: React.FC<{ profile: UserProfile | null; onBack: () => void }> = ({ profile, onBack }) => {
-  const [copied, setCopied] = useState(false);
-  const referralCode = profile?.referralCode || '';
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(referralCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Join Dr Foodie',
-          text: `Join me on Dr Foodie using my referral code: ${referralCode}`,
-          url: window.location.origin
-        });
-      } catch (err) {
-        console.error(err);
-      }
-    } else {
-      handleCopy();
-    }
-  };
-
-  return (
-    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
-          <ArrowLeft size={18}/>
-        </button>
-        <h1 className="text-2xl font-black tracking-tight text-black">Referral</h1>
-      </div>
-
-      <div className="bg-black text-white p-8 rounded-[40px] text-center relative overflow-hidden shadow-2xl">
-         <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.5),transparent_70%)]" />
-         <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
-            <Gift className="text-yellow-400" size={32} />
-         </div>
-         <h2 className="text-2xl font-black mb-2 uppercase tracking-tight">Expand the Network</h2>
-         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-6">Earn 100 Gems for every node established.</p>
-         
-         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-4 flex items-center justify-between">
-            <span className="text-xl font-black tracking-widest">{referralCode}</span>
-            <button onClick={handleCopy} className="text-[9px] font-black uppercase tracking-widest bg-white text-black px-4 py-2 rounded-xl active:scale-90 transition-all">
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-         </div>
-      </div>
-
-      <div className="space-y-3">
-         <button onClick={handleShare} className="w-full bg-white p-6 rounded-[28px] border border-gray-100 shadow-sm flex items-center justify-between active:scale-95 transition-all">
-            <div className="flex items-center gap-4">
-               <Share size={18} className="text-black/40"/>
-               <span className="text-sm font-black text-gray-700">Share Protocol</span>
-            </div>
-            <ChevronRight size={16} className="text-gray-200" />
-         </button>
-      </div>
-
-      <div className="bg-blue-50 p-6 rounded-[32px] border border-blue-100">
-         <div className="flex gap-4 items-start">
-            <Info className="text-blue-500 shrink-0" size={20} />
-            <p className="text-[11px] font-bold text-blue-700 leading-relaxed uppercase tracking-tight">
-              Airdrop multipliers are granted for active nodes in your direct network down to 3 levels deep.
-            </p>
-         </div>
-      </div>
-    </div>
-  );
-};
-
-const WorkoutPlanView: React.FC<{ routine: Exercise[]; isGenerating: boolean; onBack: () => void }> = ({ routine, isGenerating, onBack }) => {
-  if (isGenerating) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center p-10 space-y-6 text-center animate-pulse">
-        <div className="w-20 h-20 bg-black rounded-[32px] flex items-center justify-center shadow-2xl"><Loader2 className="animate-spin text-white" size={40} /></div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-black tracking-tight uppercase">Computing Routine</h2>
-          <p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">Mapping Metabolic Response...</p>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
-          <ArrowLeft size={18}/>
-        </button>
-        <h1 className="text-2xl font-black tracking-tight text-black">Routine</h1>
-      </div>
+  const PeerTransfersView = (
+    <div className="space-y-6 animate-fade-in">
+      {renderHeader("Peer Transfers", true)}
       <div className="space-y-4">
-        {routine.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-[40px] border border-gray-100 p-8 shadow-card space-y-4">
-            <Activity size={48} className="mx-auto text-gray-200" />
-            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Routine Established</p>
-            <button onClick={onBack} className="bg-black text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">Re-Compute Node</button>
-          </div>
-        ) : routine.map((ex, i) => (
-          <div key={ex.id || i} className="bg-white p-6 rounded-[36px] shadow-card border border-gray-100 space-y-4 group">
-            <div className="flex justify-between items-start gap-4">
-               <div className="flex-1">
-                 <div className="bg-black text-white px-3 py-1 rounded-full text-[8px] font-black tracking-widest inline-block mb-2">STEP 0{i+1}</div>
-                 <h3 className="text-lg font-black tracking-tight leading-tight">{ex.name}</h3>
-                 <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-0.5 rounded-full border border-gray-100 w-fit mt-2">
-                    <Flame size={10} className="text-orange-500 fill-orange-500"/>
-                    <span className="text-[10px] font-black">{ex.sets} × {ex.reps}</span>
-                 </div>
-               </div>
-               {ex.imageUrl && (
-                 <div className="w-24 h-24 rounded-2xl bg-gray-50 border border-gray-100 overflow-hidden shrink-0 shadow-sm aspect-square">
-                   <img src={ex.imageUrl} alt={ex.name} className="w-full h-full object-cover" />
-                 </div>
-               )}
+        {transfers.map((t, i) => (
+          <div key={i} className="bg-white p-8 rounded-[32px] border border-gray-50 shadow-sm">
+            <div className="flex justify-between items-start mb-2">
+              <h4 className="text-xl font-black tracking-tight">{t.fromName}</h4>
+              <div className="text-2xl font-black tracking-tighter">{t.amount} Gem</div>
             </div>
-            <div>
-              <p className="text-gray-500 text-[11px] font-medium leading-relaxed">{ex.description}</p>
+            <div className="text-[11px] font-bold text-gray-300 uppercase mb-4">
+              {t.timestamp?.toDate ? t.timestamp.toDate().toLocaleString() : new Date(t.timestamp).toLocaleString()}
             </div>
-            <div className="flex flex-wrap gap-1.5 pt-2">
-               {ex.muscleGroups.map((mg, j) => (
-                 <span key={j} className="text-[7px] font-black uppercase tracking-widest bg-gray-50 text-gray-400 px-2 py-1 rounded-md border border-gray-100">{mg}</span>
-               ))}
-            </div>
+            <div className="text-[10px] font-black text-[#3F51B5] uppercase tracking-widest bg-[#F0F2FF] px-3 py-1.5 rounded-lg inline-block">TO: {t.toCode}</div>
           </div>
         ))}
       </div>
     </div>
   );
+
+  const EditNodeView = (
+    <div className="space-y-8 animate-fade-in">
+      {renderHeader("Edit Node", true)}
+
+      <div className="bg-[#F8F9FA] p-10 rounded-[48px] border border-gray-50">
+        <div className="text-[10px] font-black text-gray-300 uppercase tracking-[0.4em] mb-4">AGENT IDENTITY</div>
+        <h2 className="text-4xl font-black tracking-tighter mb-2">{selectedUser?.name || 'AGENT'}</h2>
+        <p className="text-[12px] font-bold text-gray-400 uppercase tracking-tight">{selectedUser?.email}</p>
+      </div>
+
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-gray-300 uppercase tracking-widest px-4">GEMS BALANCE</label>
+          <div className="relative">
+            <Gem className="absolute left-8 top-1/2 -translate-y-1/2 text-yellow-500" size={24} />
+            <input 
+              type="number"
+              value={editGems}
+              onChange={e => setEditGems(e.target.value)}
+              className="w-full pl-20 pr-8 py-8 bg-white rounded-[32px] border border-gray-100 font-black text-3xl shadow-sm"
+            />
+          </div>
+        </div>
+
+        <div className="bg-white p-10 rounded-[40px] border border-gray-50 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-6">
+            <Crown className="text-gray-200" size={32} />
+            <span className="text-xl font-black tracking-tight">Pro Status</span>
+          </div>
+          <button 
+            onClick={() => setEditPro(!editPro)}
+            className={`w-16 h-10 rounded-full transition-all relative ${editPro ? 'bg-black' : 'bg-gray-100'}`}
+          >
+            <div className={`absolute top-1.5 w-7 h-7 rounded-full bg-white shadow-md transition-all ${editPro ? 'right-1.5' : 'left-1.5'}`} />
+          </button>
+        </div>
+
+        <button 
+          onClick={handleUpdateNode}
+          disabled={isUpdating}
+          className="w-full py-8 bg-black text-white rounded-[32px] font-black text-lg uppercase tracking-widest flex items-center justify-center gap-4 shadow-2xl active:scale-95 transition-all disabled:opacity-50 mt-4"
+        >
+          {isUpdating ? <Loader2 className="animate-spin" size={24}/> : <Save size={24}/>}
+          Deploy Updates
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-md mx-auto min-h-screen bg-white text-black relative flex flex-col font-sans overflow-hidden shadow-2xl">
+      <div className="flex-1 overflow-y-auto no-scrollbar p-6 pb-32">
+        {loading ? (
+          <div className="h-full flex flex-col items-center justify-center py-40 gap-4">
+            <Loader2 className="animate-spin text-black/10" size={48} />
+            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Accessing Central Command...</p>
+          </div>
+        ) : (
+          <>
+            {adminSubView === 'edit_node' ? EditNodeView : 
+             adminSubView === 'peer_transfers' ? PeerTransfersView : 
+             adminTab === 'home' ? HomeView :
+             adminTab === 'nodes' ? NodesView :
+             adminTab === 'transactions' ? <div className="animate-fade-in">{renderHeader("Transactions", true, () => setAdminTab('home'))}<div className="p-20 text-center text-gray-200 font-black uppercase text-xs tracking-widest">No Direct Sales Logged</div></div> :
+             adminTab === 'stats' ? <div className="animate-fade-in">{renderHeader("Network Stats", true, () => setAdminTab('home'))}<div className="p-20 text-center text-gray-200 font-black uppercase text-xs tracking-widest">Analytics Nodes Offline</div></div> :
+             adminTab === 'settings' ? <div className="animate-fade-in">{renderHeader("System Control", true, () => setAdminTab('home'))}<div className="p-20 text-center text-gray-200 font-black uppercase text-xs tracking-widest">Configuration Encrypted</div></div> : 
+             null}
+          </>
+        )}
+      </div>
+
+      {/* Admin Bottom Nav Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-3xl border-t border-gray-100 p-6 pb-10 flex justify-between items-center z-50 max-w-md mx-auto px-8 shadow-floating">
+        <button onClick={() => { setAdminTab('home'); setAdminSubView('none'); }} className={`transition-all ${adminTab === 'home' && adminSubView === 'none' ? 'text-black scale-125' : 'text-gray-200'}`}><Home size={24} strokeWidth={2.5}/></button>
+        <button onClick={() => { setAdminTab('transactions'); setAdminSubView('none'); }} className={`transition-all ${adminTab === 'transactions' ? 'text-black scale-125' : 'text-gray-200'}`}><DollarSign size={24} strokeWidth={2.5}/></button>
+        <div className="relative -mt-16 flex justify-center z-50">
+          <button 
+            onClick={() => { setAdminTab('nodes'); setAdminSubView('none'); }} 
+            className={`w-20 h-20 rounded-full flex items-center justify-center border-[8px] border-white shadow-2xl active:scale-90 transition-all ${adminTab === 'nodes' ? 'bg-black text-white' : 'bg-white text-gray-200'}`}
+          >
+            <Users size={32} strokeWidth={2.5}/>
+          </button>
+        </div>
+        <button onClick={() => { setAdminTab('stats'); setAdminSubView('none'); }} className={`transition-all ${adminTab === 'stats' ? 'text-black scale-125' : 'text-gray-200'}`}><BarChart2 size={24} strokeWidth={2.5}/></button>
+        <button onClick={() => { setAdminTab('settings'); setAdminSubView('none'); }} className={`transition-all ${adminTab === 'settings' ? 'text-black scale-125' : 'text-gray-200'}`}><Settings size={24} strokeWidth={2.5}/></button>
+      </nav>
+    </div>
+  );
 };
 
-const AnalysisDetailView: React.FC<{ analysis: ScanHistoryItem | null; isAnalyzing: boolean; onBack: () => void; onDelete: () => void }> = ({ analysis, isAnalyzing, onBack, onDelete }) => {
-  if (!analysis) return null;
+const VerificationBanner: React.FC<{ onResend: () => void; isResending: boolean }> = ({ onResend, isResending }) => (
+  <div className="bg-orange-50 border border-orange-100 p-4 rounded-[28px] mb-6 flex gap-3 items-start shadow-sm">
+    <ShieldAlert className="text-orange-500 shrink-0 mt-0.5" size={18} />
+    <div className="flex-1 min-w-0">
+      <p className="text-[10px] font-black text-orange-900 uppercase tracking-tight">Email Verification Needed</p>
+      <p className="text-[9px] text-orange-800/70 font-bold leading-tight mt-0.5">Please verify your email to unlock all features.</p>
+      <button onClick={onResend} disabled={isResending} className="text-[8px] font-black text-orange-600 uppercase tracking-widest mt-1.5 flex items-center gap-1">
+        {isResending ? <Loader2 size={8} className="animate-spin" /> : <RefreshCw size={8} />} Resend Link
+      </button>
+    </div>
+  </div>
+);
+
+const PendingScanCard: React.FC<{ imageUrl: string }> = ({ imageUrl }) => (
+  <div className="bg-white p-4 rounded-[32px] flex gap-4 shadow-card items-center border border-gray-50 relative overflow-hidden animate-pulse">
+    <div className="w-14 h-14 rounded-2xl bg-gray-100 overflow-hidden shrink-0">
+      <img src={imageUrl} className="w-full h-full object-cover opacity-40 grayscale" />
+    </div>
+    <div className="flex-1">
+      <div className="h-4 w-24 bg-gray-100 rounded-full mb-2" />
+      <div className="h-2 w-32 bg-gray-50 rounded-full" />
+    </div>
+    <Loader2 size={16} className="text-gray-200 animate-spin mr-2" />
+  </div>
+);
+
+const StatsView: React.FC<{ scans: ScanHistoryItem[]; currentCalTarget: number; profile: UserProfile | null; onBack: () => void }> = ({ scans, currentCalTarget, profile, onBack }) => {
+  const chartData = useMemo(() => {
+    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    return days.map((day, i) => {
+      const dayScans = scans.filter(s => new Date(s.timestamp).getDay() === i);
+      const total = dayScans.reduce((acc, s) => acc + (s.calories || 0), 0);
+      return { day, calories: total };
+    });
+  }, [scans]);
+
+  const avgHealth = scans.length > 0 
+    ? (scans.reduce((a, b) => a + b.healthScore, 0) / scans.length).toFixed(1) 
+    : "0.0";
+
   return (
-    <div className="h-full flex flex-col animate-fade-in overflow-hidden bg-[#F2F2F7]">
-      <div className="relative h-2/5 shrink-0">
-        <img src={analysis.imageUrl} className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
-        <button onClick={onBack} className="absolute top-8 left-6 p-4 bg-black/20 backdrop-blur-md rounded-2xl text-white active:scale-95 transition-all"><ArrowLeft size={20}/></button>
-        <button onClick={onDelete} className="absolute top-8 right-6 p-4 bg-red-500/20 backdrop-blur-md rounded-2xl text-red-400 active:scale-95 transition-all"><Trash2 size={20}/></button>
-        <div className="absolute bottom-8 left-8 right-8">
-           <div className="text-[10px] font-black text-white/50 uppercase tracking-[0.4em] mb-2">{analysis.mealType} • {new Date(analysis.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-           <h1 className="text-4xl font-black text-white tracking-tighter leading-none">{analysis.foodName}</h1>
+    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+        <h1 className="text-2xl font-black tracking-tight text-black">Insights</h1>
+      </div>
+
+      <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-10">
+        <div className="flex justify-between items-center">
+          <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">Calorie Trend</h3>
+          <div className="bg-black text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">Metabolism</div>
+        </div>
+        <div className="h-44 w-full flex items-end justify-between px-1 gap-2">
+          {chartData.map((d, i) => {
+            const height = Math.max(8, Math.min(100, (d.calories / (currentCalTarget * 1.5)) * 100));
+            const isOver = d.calories > currentCalTarget;
+            return (
+              <div key={i} className="flex-1 flex flex-col items-center gap-3 h-full">
+                <div className="w-full bg-gray-50 rounded-full relative overflow-hidden h-full">
+                  <div 
+                    className={`absolute bottom-0 left-0 right-0 rounded-full transition-all duration-1000 ease-out ${isOver ? 'bg-orange-500' : 'bg-black'}`} 
+                    style={{ height: `${height}%` }} 
+                  />
+                </div>
+                <span className="text-[8px] font-black text-gray-300">{d.day}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
-      <div className="bg-[#F2F2F7] -mt-6 rounded-t-[40px] flex-1 overflow-y-auto no-scrollbar p-8 space-y-6 pb-40 relative z-10 shadow-[0_-10px_30px_rgba(0,0,0,0.1)]">
-        <div className="grid grid-cols-4 gap-3">
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 text-center">
+          <div className="text-[8px] font-black text-gray-300 uppercase tracking-widest mb-2">Avg. Health</div>
+          <div className="text-4xl font-black tracking-tighter">{avgHealth}</div>
+        </div>
+        <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 text-center">
+          <div className="text-[8px] font-black text-gray-300 uppercase tracking-widest mb-2">Total Scans</div>
+          <div className="text-4xl font-black tracking-tighter">{scans.length}</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const VaultView: React.FC<{ profile: UserProfile | null; onTransfer: (c: string, a: number) => void; onBack: () => void; isVerified: boolean }> = ({ profile, onTransfer, onBack, isVerified }) => {
+  const [code, setCode] = useState('');
+  const [amt, setAmt] = useState('100');
+
+  return (
+    <div className="pt-4 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+        <h1 className="text-2xl font-black tracking-tight text-black">Vault</h1>
+      </div>
+
+      <div className="bg-[#0A0A0A] text-white p-10 rounded-[48px] text-center relative overflow-hidden shadow-2xl">
+        <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle_at_50%_0%,white,transparent_70%)]" />
+        <div className="text-[9px] font-black text-gray-500 uppercase tracking-[0.4em] mb-4">TOTAL ASSETS</div>
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <span className="text-6xl font-black tracking-tighter">{profile?.points || 0}</span>
+          <Gem className="text-yellow-500 fill-yellow-500" size={28} />
+        </div>
+        <div className="text-[9px] font-black text-yellow-500 bg-white/5 py-2 px-5 rounded-full inline-block uppercase tracking-[0.2em] border border-white/5">
+          USER ID: {profile?.uniqueTransferCode || 'SYNCING...'}
+        </div>
+      </div>
+
+      <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-4">
+        <div className="flex items-center gap-2 px-1">
+          <Zap size={14} className="text-yellow-500 fill-yellow-500" />
+          <h3 className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Earning Protocol</h3>
+        </div>
+        <div className="space-y-3">
           {[
-            { label: 'Energy', val: analysis.calories, unit: 'kcal', icon: <Flame size={12}/> },
-            { label: 'Protein', val: analysis.protein, unit: 'g', icon: <Activity size={12}/> },
-            { label: 'Carbs', val: analysis.carbs, unit: 'g', icon: <Target size={12}/> },
-            { label: 'Fat', val: analysis.fat, unit: 'g', icon: <Heart size={12}/> },
-          ].map((stat, i) => (
-            <div key={i} className="bg-white p-3 rounded-[24px] text-center border border-gray-100 shadow-sm flex flex-col items-center justify-center">
-               <div className="mb-1 text-black/10">{stat.icon}</div>
-               <div className="text-sm font-black tracking-tighter leading-none">{stat.val}</div>
-               <div className="text-[7px] font-black text-gray-700 uppercase tracking-tight mt-1 leading-none text-center">{stat.label}</div>
-               <div className="text-[6px] font-black text-gray-300 uppercase tracking-widest mt-0.5">{stat.unit}</div>
+            { label: 'Metabolic Scan', icon: <Camera size={18}/>, reward: '+5 Gems' },
+            { label: 'Node Expansion', icon: <Users size={18}/>, reward: '+100 Gems' },
+            { label: 'Premium Upgrade', icon: <Crown size={18}/>, reward: '+250 Gems' }
+          ].map((item, i) => (
+            <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-[28px] border border-gray-100">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-sm text-black/40">{item.icon}</div>
+                <div><div className="text-[11px] font-black leading-none">{item.label}</div><div className="text-[8px] text-gray-400 font-bold uppercase mt-1">PER SUCCESSFUL EVENT</div></div>
+              </div>
+              <div className="bg-yellow-100/50 text-yellow-600 px-3 py-2 rounded-full text-[9px] font-black">{item.reward}</div>
             </div>
           ))}
         </div>
-        <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm">
-           <div className="flex justify-between items-center mb-4">
-              <h3 className="text-[9px] font-black uppercase text-gray-400 tracking-widest px-1">Dr Foodie Insights</h3>
-              <div className="bg-black text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">SCORE: {analysis.healthScore}/10</div>
-           </div>
-           <p className="text-sm font-bold text-gray-700 leading-relaxed italic border-l-4 border-black pl-4">"{analysis.microAnalysis}"</p>
+      </div>
+
+      <div className="bg-gradient-to-br from-yellow-400 to-yellow-600 p-8 rounded-[40px] shadow-xl relative overflow-hidden group">
+        <div className="absolute -right-6 -bottom-6 opacity-10 group-hover:scale-110 transition-transform duration-700"><Lightning size={140} className="text-white fill-white" /></div>
+        <div className="relative z-10 space-y-3">
+          <div className="bg-black text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest inline-block">PHASE 1: EARN</div>
+          <h2 className="text-3xl font-black text-black leading-none tracking-tighter uppercase">The Great Airdrop</h2>
+          <p className="text-black/80 text-[11px] font-bold leading-tight">Convert coins into <span className="font-black">Real Money</span> at the reveal.</p>
+        </div>
+      </div>
+
+      <div className={`bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-4 ${!isVerified ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
+        <div className="flex justify-between items-center px-1">
+          <h3 className="text-[9px] font-black text-gray-300 uppercase tracking-widest flex items-center gap-2"><Send size={12}/> Peer Transfer</h3>
+          <div className="text-[8px] font-black text-green-500 bg-green-50 px-2 py-1 rounded-md uppercase">Zero Fee</div>
         </div>
         <div className="space-y-3">
-           <h3 className="text-[9px] font-black uppercase text-gray-400 tracking-widest px-1">Metabolic Alternatives</h3>
-           <div className="grid grid-cols-1 gap-2">
-             {analysis.alternatives?.map((alt, i) => (
-               <div key={i} className="bg-white/50 border border-gray-100 p-4 rounded-2xl flex items-center justify-between group hover:bg-white hover:shadow-sm transition-all">
-                 <span className="text-xs font-black text-gray-600">{alt}</span>
-                 <Sparkle size={14} className="text-yellow-500 opacity-20 group-hover:opacity-100 transition-opacity" />
-               </div>
-             ))}
-           </div>
+          <input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="Unique Code (INR-XXXXXX)" className="w-full p-5 rounded-2xl bg-gray-50 border-none font-bold text-sm shadow-inner" />
+          <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="100" className="w-full p-5 rounded-2xl bg-gray-50 border-none font-bold text-sm shadow-inner" />
+          <button onClick={()=>onTransfer(code, parseInt(amt))} className="w-full bg-black text-white py-5 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">Authorize Transfer</button>
         </div>
       </div>
     </div>
   );
 };
 
-const ClarificationModal: React.FC<{
-  question: string;
-  onAnswer: (ans: string) => void;
-  onApprox: () => void;
-  onCancel: () => void;
-}> = ({ question, onAnswer, onApprox, onCancel }) => {
-  const [answer, setAnswer] = useState('');
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/80 backdrop-blur-lg animate-fade-in">
-      <div className="bg-white rounded-[40px] w-full max-w-sm overflow-hidden p-8 space-y-6 shadow-2xl border border-white/20">
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <HelpCircle className="text-blue-500" size={28} />
-          </div>
-          <h2 className="text-2xl font-black tracking-tight">Need Details</h2>
-          <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest leading-relaxed px-2 text-center">{question}</p>
-        </div>
-        
-        <textarea
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value.substring(0, 200))}
-          placeholder="e.g. It's a chicken salad with olive oil dressing"
-          className="w-full p-5 rounded-3xl bg-gray-50 border-none font-bold text-sm shadow-inner min-h-[120px] focus:ring-1 focus:ring-black transition-all resize-none shadow-inner"
-        />
+const CashoutView: React.FC<{ profile: UserProfile | null; onBack: () => void; onManageUpi: () => void; isVerified: boolean }> = ({ profile, onBack, onManageUpi, isVerified }) => {
+  const streak = profile?.currentStreak || 0;
+  const milestones = [
+    { target: 30, reward: 200 },
+    { target: 60, reward: 500 },
+    { target: 90, reward: 999 }
+  ];
 
-        <div className="space-y-3">
-          <button
-            onClick={() => onAnswer(answer)}
-            disabled={!answer.trim()}
-            className="w-full bg-black text-white py-4 rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all disabled:opacity-30"
-          >
-            Update Metabolic Node
-          </button>
-          
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={onApprox} className="bg-gray-100 text-gray-500 py-4 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] active:scale-95 transition-all">Approximate</button>
-            <button onClick={onCancel} className="bg-white border border-gray-100 text-gray-400 py-4 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] active:scale-95 transition-all">Cancel</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const UnlockWorkoutView: React.FC<{
-  currentGems: number;
-  isUnlocking: boolean;
-  onUnlock: () => void;
-  onGoToWallet: () => void;
-  onBack: () => void;
-}> = ({ currentGems, isUnlocking, onUnlock, onGoToWallet, onBack }) => {
-  const hasEnough = currentGems >= WORKOUT_UNLOCK_COST;
   return (
-    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
+    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
       <div className="flex items-center gap-3">
         <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
-        <h1 className="text-2xl font-black tracking-tight text-black">Training Node</h1>
+        <h1 className="text-2xl font-black tracking-tight text-black">Cashout</h1>
       </div>
 
-      <div className="bg-[#0A0A0A] text-white p-10 rounded-[45px] relative overflow-hidden shadow-2xl border border-white/5 text-center">
-         <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.2),transparent_70%)]" />
-         <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10 backdrop-blur-md">
-            <Lock className="text-yellow-400" size={32} />
-         </div>
-         <h2 className="text-2xl font-black mb-3 uppercase tracking-tight">Clinical Training Module</h2>
-         <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed mb-8">Unlock personalized workout routines designed for your metabolic profile.</p>
-         
-         <div className="inline-flex items-center gap-3 bg-white/5 border border-white/10 rounded-full px-6 py-3 mb-6">
-            <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">COST:</div>
-            <div className="flex items-center gap-2">
-               <span className="text-xl font-black tracking-tighter text-yellow-400">500</span>
-               <Gem className="text-yellow-400" size={16} />
-            </div>
-         </div>
-      </div>
-
-      <div className="space-y-4">
-        <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm flex items-center justify-between">
-           <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-yellow-50 rounded-xl flex items-center justify-center text-yellow-600 shadow-inner">
-                 <Gem size={20}/>
-              </div>
-              <div>
-                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Your Balance</div>
-                <div className="text-xl font-black tracking-tighter">{formatCoins(currentGems)} Gems</div>
-              </div>
-           </div>
-           {!hasEnough && <div className="text-[9px] font-black text-red-500 bg-red-50 px-3 py-1.5 rounded-full uppercase">Low Balance</div>}
+      <div className="bg-[#0A0A0A] text-white p-10 rounded-[48px] relative overflow-hidden shadow-2xl">
+        <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle_at_50%_0%,white,transparent_70%)]" />
+        <div className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mb-6">CURRENT STREAK</div>
+        <div className="flex items-center gap-5">
+          <div className="w-20 h-20 bg-white/10 rounded-[28px] flex items-center justify-center border border-white/10 backdrop-blur-md">
+            <Flame size={40} className="text-orange-500 fill-orange-500" />
+          </div>
+          <div>
+            <div className="text-5xl font-black tracking-tighter">{streak} Days</div>
+            <div className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">METABOLIC CHAIN ACTIVE</div>
+          </div>
         </div>
+        <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Smartphone size={16} className="text-gray-500"/>
+            <span className="text-[10px] font-black text-gray-300 tracking-widest uppercase">{profile?.upiId || 'NO UPLINK'}</span>
+          </div>
+          <button onClick={onManageUpi} className="text-[9px] font-black text-yellow-400 bg-yellow-400/10 px-3 py-1.5 rounded-full border border-yellow-400/20 active:scale-95">Edit Node</button>
+        </div>
+      </div>
 
-        {hasEnough ? (
-          <button 
-            onClick={onUnlock}
-            disabled={isUnlocking}
-            className="w-full bg-black text-white py-5 rounded-[28px] font-black text-sm shadow-2xl active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
-          >
-            {isUnlocking ? <Loader2 className="animate-spin" size={20}/> : <><ShieldCheck size={20} className="text-yellow-400"/> Authorize Unlock</>}
-          </button>
-        ) : (
-          <button 
-            onClick={onGoToWallet}
-            className="w-full bg-black text-white py-5 rounded-[28px] font-black text-sm shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3"
-          >
-            <Plus size={20} className="text-yellow-400"/> Acquire More Gems
-          </button>
-        )}
-        
-        <p className="text-[9px] text-center text-gray-400 font-bold uppercase tracking-widest px-8">Unlocking grants permanent access to clinical workout generation nodes.</p>
+      <div className="space-y-4 pt-4">
+        <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] px-2">Reward Milestones</h3>
+        {milestones.map((m, i) => {
+          const progress = Math.min(100, (streak / m.target) * 100);
+          const daysLeft = Math.max(0, m.target - streak);
+          return (
+            <div key={i} className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-5">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center shadow-inner">
+                    {i === 0 ? <Wallet size={20} className="text-blue-500" /> : i === 1 ? <Banknote size={20} className="text-green-500" /> : <Trophy size={20} className="text-yellow-500" />}
+                  </div>
+                  <div><div className="text-base font-black tracking-tight">₹{m.reward} Reward</div><div className="text-[9px] text-gray-300 font-black uppercase tracking-widest">{m.target} Day Milestone</div></div>
+                </div>
+                <div className="text-[9px] font-black text-gray-300 uppercase tracking-widest">{daysLeft} Days Left</div>
+              </div>
+              <div className="w-full h-2.5 bg-gray-50 rounded-full overflow-hidden">
+                <div className="h-full bg-black rounded-full transition-all duration-1000" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="bg-yellow-50 p-8 rounded-[40px] border border-yellow-100 space-y-4">
+        <div className="flex items-center gap-3 text-yellow-700">
+          <Info size={20} /><span className="text-[11px] font-black uppercase tracking-tighter">Protocol Rules:</span>
+        </div>
+        <p className="text-[10px] font-bold text-yellow-800/70 leading-relaxed uppercase">You must scan at least one meal every 24 hours to register your day. Skipping a scan for one day will reset your metabolic streak to zero.</p>
+        <p className="text-[9px] font-black text-yellow-600/60 italic uppercase tracking-widest">Rewards are credited to your Dr Foodie Vault upon verification of nodes.</p>
       </div>
     </div>
   );
 };
 
-const WorkoutLocationView: React.FC<{ onBack: () => void; onSelect: (loc: WorkoutLocation) => void }> = ({ onBack, onSelect }) => {
-  return (
-    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
-          <ArrowLeft size={18}/>
-        </button>
-        <h1 className="text-2xl font-black tracking-tight text-black">Training Node</h1>
+const TeamSection: React.FC<{ onBack: () => void }> = ({ onBack }) => (
+  <div className="pt-6 space-y-8 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+    <div className="flex items-center gap-3">
+      <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+      <h1 className="text-3xl font-black tracking-tight text-black">The Team</h1>
+    </div>
+
+    <div className="bg-black text-white p-10 rounded-[48px] relative overflow-hidden shadow-2xl">
+      <div className="absolute top-6 right-8 opacity-20"><Crown size={80} strokeWidth={1} /></div>
+      <div className="relative z-10">
+        <p className="text-[9px] font-black text-gray-500 uppercase tracking-[0.5em] mb-2">FOUNDER</p>
+        <h2 className="text-4xl font-black tracking-tighter mb-1">Charan Ravanam</h2>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">FOUNDER AND CEO</p>
       </div>
-      <div className="grid grid-cols-1 gap-4">
+    </div>
+
+    <div className="bg-white rounded-[48px] p-8 shadow-card border border-gray-50 space-y-6">
+      <div className="flex items-center gap-3 text-gray-300">
+        <Users size={16} /><h3 className="text-[9px] font-black uppercase tracking-[0.4em]">CORE TEAM MEMBERS</h3>
+      </div>
+      <div className="space-y-4">
         {[
-          { id: WorkoutLocation.HOME, icon: <Home size={24}/>, label: 'Home Protocol', desc: 'Metabolic bodyweight routines.' },
-          { id: WorkoutLocation.GYM, icon: <Dumbbell size={24}/>, label: 'Gym Protocol', desc: 'Full machine protocol access.' }
-        ].map(loc => (
-          <button key={loc.id} onClick={() => onSelect(loc.id)} className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-card flex flex-col items-center text-center gap-4 active:scale-95 transition-all group">
-            <div className="w-16 h-16 bg-gray-50 rounded-[28px] flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
-              {loc.icon}
+          { name: 'Kranthi Madireddy', role: 'CMO (Chief Marketing Officer)' },
+          { name: 'Gagan Adithya Reddy', role: 'CORE TEAM MEMBER' }
+        ].map((m, i) => (
+          <div key={i} className="flex items-center gap-5 p-6 bg-gray-50/50 rounded-[32px] border border-gray-100 group hover:bg-white hover:shadow-sm transition-all">
+            <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center font-black text-xl shadow-sm border border-gray-100 transition-transform group-hover:scale-110">
+              {m.name.charAt(0)}
             </div>
             <div>
-              <h3 className="text-xl font-black tracking-tight">{loc.label}</h3>
-              <p className="text-xs text-gray-400 font-medium mt-1">{loc.desc}</p>
+              <div className="text-lg font-black tracking-tight leading-none text-black">{m.name}</div>
+              <div className="text-[8px] font-bold text-gray-400 uppercase tracking-[0.3em] mt-1.5">{m.role}</div>
             </div>
-          </button>
+          </div>
         ))}
+      </div>
+    </div>
+  </div>
+);
+
+const UnlockWorkoutView: React.FC<{ currentGems: number; isUnlocking: boolean; onUnlock: () => void; onGoToWallet: () => void; onBack: () => void }> = ({ currentGems, isUnlocking, onUnlock, onGoToWallet, onBack }) => (
+  <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+    <div className="flex items-center gap-3">
+      <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+      <h1 className="text-2xl font-black tracking-tight text-black">Training Node</h1>
+    </div>
+    <div className="bg-black text-white p-10 rounded-[48px] text-center shadow-2xl relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle_at_50%_0%,white,transparent_70%)]" />
+      <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-8 border border-white/10 backdrop-blur-md">
+        <Lock className="text-yellow-400" size={32} />
+      </div>
+      <h2 className="text-3xl font-black tracking-tight uppercase leading-tight mb-4">Clinical Training Module</h2>
+      <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed mb-10 px-4">Unlock personalized workout routines designed for your metabolic profile.</p>
+      <div className="bg-white/5 border border-white/10 py-3 px-6 rounded-full inline-flex items-center gap-3 mb-4 backdrop-blur-md">
+        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">COST:</span>
+        <span className="text-2xl font-black text-yellow-400 tracking-tighter">500 <Gem className="inline mb-1" size={16}/></span>
+      </div>
+    </div>
+
+    <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-yellow-50 rounded-xl flex items-center justify-center text-yellow-500 shadow-inner"><Gem size={20}/></div>
+          <div><div className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Your Balance</div><div className="text-2xl font-black tracking-tighter">{currentGems} Gems</div></div>
+        </div>
+        {currentGems < 500 && <div className="bg-red-50 text-red-500 px-3 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest">Low Balance</div>}
+      </div>
+      {currentGems >= 500 ? (
+        <button onClick={onUnlock} disabled={isUnlocking} className="w-full py-5 bg-black text-white rounded-[24px] font-black text-xs uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all">Authorize Unlock</button>
+      ) : (
+        <button onClick={onGoToWallet} className="w-full py-5 bg-black text-white rounded-[24px] font-black text-xs uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"><Plus size={16} className="text-yellow-400"/> Acquire More Gems</button>
+      )}
+      <p className="text-[8px] text-center text-gray-300 font-bold uppercase tracking-[0.2em] mt-5 px-6 leading-relaxed">Unlocking grants permanent access to clinical workout generation nodes.</p>
+    </div>
+  </div>
+);
+
+const AnalysisDetailView: React.FC<{ analysis: ScanHistoryItem | null; isAnalyzing: boolean; onBack: () => void; onDelete: () => void }> = ({ analysis, isAnalyzing, onBack, onDelete }) => (
+  <div className="h-full overflow-y-auto no-scrollbar bg-white">
+    <div className="relative h-[45vh]">
+      <img src={analysis?.imageUrl} className="w-full h-full object-cover" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
+      <div className="absolute top-8 left-6 right-6 flex justify-between z-20">
+        <button onClick={onBack} className="p-4 bg-black/20 backdrop-blur-md rounded-2xl text-white border border-white/20 active:scale-90 transition-all"><ArrowLeft size={20}/></button>
+        <button onClick={onDelete} className="p-4 bg-red-500/20 backdrop-blur-md rounded-2xl text-white border border-red-500/20 active:scale-90 transition-all"><Trash2 size={20}/></button>
+      </div>
+      <div className="absolute bottom-12 left-8 right-8 text-white">
+        <p className="text-[10px] font-black uppercase tracking-[0.4em] mb-2 opacity-50">{analysis?.mealType} • {new Date(analysis?.timestamp || '').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+        <h1 className="text-4xl font-black tracking-tighter leading-none">{analysis?.foodName}</h1>
+      </div>
+    </div>
+    <div className="px-8 pb-32 -mt-8 relative z-30">
+      <div className="bg-white p-8 rounded-[48px] shadow-2xl border border-gray-100 space-y-10">
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            { l: 'Energy', v: analysis?.calories, u: 'kcal' },
+            { l: 'Protein', v: analysis?.protein, u: 'g' },
+            { l: 'Carbs', v: analysis?.carbs, u: 'g' },
+            { l: 'Fat', v: analysis?.fat, u: 'g' }
+          ].map(stat => (
+            <div key={stat.l} className="bg-gray-50 p-4 rounded-3xl text-center border border-gray-100 flex flex-col justify-center items-center">
+              <div className="text-[7px] font-black text-gray-400 uppercase tracking-widest mb-1">{stat.l}</div>
+              <div className="text-sm font-black text-black leading-none">{stat.v}</div>
+              <div className="text-[7px] text-gray-300 font-bold uppercase mt-0.5">{stat.u}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex justify-between items-center mb-4 px-1">
+            <h4 className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em]">Dr Foodie Insights</h4>
+            <div className="bg-black text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">Score: {analysis?.healthScore}/10</div>
+          </div>
+          <div className="bg-gray-50/50 p-6 rounded-[32px] border-l-4 border-black">
+            <p className="text-sm font-bold text-gray-700 leading-relaxed italic">"{analysis?.microAnalysis}"</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h4 className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] px-1">Metabolic Alternatives</h4>
+          <div className="space-y-3">
+            {analysis?.alternatives.map((alt, i) => (
+              <div key={i} className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-[28px] shadow-sm group hover:scale-[1.02] transition-transform">
+                <span className="text-xs font-black text-gray-600 uppercase tracking-tight">{alt}</span>
+                <Sparkle size={14} className="text-yellow-400 opacity-20 group-hover:opacity-100" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Added sub-components to fix missing component errors
+const ReferralView: React.FC<{ profile: UserProfile | null; onBack: () => void; isVerified: boolean }> = ({ profile, onBack, isVerified }) => (
+  <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+    <div className="flex items-center gap-3">
+      <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+      <h1 className="text-2xl font-black tracking-tight text-black">Referrals</h1>
+    </div>
+    <div className="bg-black text-white p-10 rounded-[48px] text-center shadow-2xl">
+      <div className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mb-4">YOUR NODE ID</div>
+      <div className="text-4xl font-black tracking-tighter mb-4">{profile?.referralCode || 'SYNCING...'}</div>
+      <button onClick={() => { navigator.clipboard.writeText(profile?.referralCode || ''); alert("Code copied to clipboard."); }} className="bg-white/10 text-[9px] font-black uppercase tracking-widest px-6 py-3 rounded-full border border-white/10 active:scale-95">Copy Referral Node</button>
+    </div>
+    <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-4">
+      <h3 className="text-[9px] font-black text-gray-300 uppercase tracking-widest px-1">Rewards</h3>
+      <div className="p-6 bg-yellow-50 rounded-[32px] border border-yellow-100">
+        <p className="text-[11px] font-bold text-yellow-800 leading-relaxed uppercase">Share your node ID with friends. When they establish a connection, both of you receive a Gem bonus.</p>
+      </div>
+    </div>
+  </div>
+);
+
+const UPIEntryView: React.FC<{ onSave: (id: string) => void; onBack: () => void }> = ({ onSave, onBack }) => {
+  const [upi, setUpi] = useState('');
+  return (
+    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+        <h1 className="text-2xl font-black tracking-tight text-black">UPI Uplink</h1>
+      </div>
+      <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-5">
+        <div className="space-y-2">
+          <label className="text-[9px] font-black text-gray-300 uppercase tracking-widest px-1">UPI ID / Phone Number</label>
+          <input value={upi} onChange={e=>setUpi(e.target.value)} placeholder="username@bank" className="w-full p-5 rounded-2xl bg-gray-50 border-none font-bold text-sm shadow-inner" />
+        </div>
+        <button onClick={()=>onSave(upi)} className="w-full bg-black text-white py-5 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">Save Node</button>
       </div>
     </div>
   );
 };
 
-const WorkoutFocusView: React.FC<{
-  location: WorkoutLocation;
-  selectedGroups: MuscleGroup[];
-  onToggle: (group: MuscleGroup) => void;
-  onGenerate: () => void;
-  onBack: () => void;
-}> = ({ location, selectedGroups, onToggle, onGenerate, onBack }) => {
-  return (
-    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all">
-          <ArrowLeft size={18}/>
+const WorkoutLocationView: React.FC<{ onBack: () => void; onSelect: (loc: WorkoutLocation) => void }> = ({ onBack, onSelect }) => (
+  <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+    <div className="flex items-center gap-3">
+      <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+      <h1 className="text-2xl font-black tracking-tight text-black">Location</h1>
+    </div>
+    <div className="grid grid-cols-1 gap-4">
+      <button onClick={() => onSelect(WorkoutLocation.HOME)} className="bg-white p-10 rounded-[48px] shadow-card border border-gray-100 flex flex-col items-center gap-4 active:scale-95 transition-all">
+        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-black/10"><Home size={32}/></div>
+        <span className="text-xl font-black tracking-tight uppercase">Home Training</span>
+      </button>
+      <button onClick={() => onSelect(WorkoutLocation.GYM)} className="bg-white p-10 rounded-[48px] shadow-card border border-gray-100 flex flex-col items-center gap-4 active:scale-95 transition-all">
+        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-black/10"><Dumbbell size={32}/></div>
+        <span className="text-xl font-black tracking-tight uppercase">Gym Facility</span>
+      </button>
+    </div>
+  </div>
+);
+
+const WorkoutFocusView: React.FC<{ location: WorkoutLocation; selectedGroups: MuscleGroup[]; onToggle: (g: MuscleGroup) => void; onGenerate: () => void; onBack: () => void }> = ({ location, selectedGroups, onToggle, onGenerate, onBack }) => (
+  <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+    <div className="flex items-center gap-3">
+      <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+      <h1 className="text-2xl font-black tracking-tight text-black">Focus Areas</h1>
+    </div>
+    <div className="grid grid-cols-2 gap-3">
+      {Object.values(MuscleGroup).map(g => (
+        <button key={g} onClick={() => onToggle(g)} className={`p-6 rounded-[32px] text-center font-black text-xs uppercase tracking-widest transition-all ${selectedGroups.includes(g) ? 'bg-black text-white shadow-xl scale-105' : 'bg-white text-gray-300 border border-gray-50'}`}>
+          {g}
         </button>
-        <h1 className="text-2xl font-black tracking-tight text-black">Muscle Nodes</h1>
+      ))}
+    </div>
+    <button onClick={onGenerate} disabled={selectedGroups.length === 0} className="w-full py-5 bg-black text-white rounded-[24px] font-black text-xs uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all mt-6 disabled:opacity-40">Generate Protocol</button>
+  </div>
+);
+
+const WorkoutPlanView: React.FC<{ routine: Exercise[]; isGenerating: boolean; onBack: () => void }> = ({ routine, isGenerating, onBack }) => (
+  <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+    <div className="flex items-center gap-3">
+      <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+      <h1 className="text-2xl font-black tracking-tight text-black">Routine</h1>
+    </div>
+    {isGenerating ? (
+      <div className="bg-white p-20 rounded-[48px] shadow-card border border-gray-100 flex flex-col items-center justify-center gap-6">
+        <Loader2 className="animate-spin text-black/10" size={64}/>
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-300">Synchronizing Training Nodes...</p>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        {Object.values(MuscleGroup).map((mg) => (
-          <button
-            key={mg}
-            onClick={() => onToggle(mg)}
-            className={`p-5 rounded-[28px] border font-black text-[10px] uppercase tracking-widest transition-all ${selectedGroups.includes(mg) ? 'bg-black text-white border-black shadow-xl' : 'bg-white text-gray-400 border-gray-100 shadow-sm'}`}
-          >
-            {mg}
-          </button>
+    ) : (
+      <div className="space-y-4">
+        {routine.map((ex, i) => (
+          <div key={ex.id} className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-xl font-black tracking-tighter leading-tight">{ex.name}</h3>
+                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mt-1">{ex.sets} Sets • {ex.reps} Reps</p>
+              </div>
+              <div className="bg-black text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">Exercise {i+1}</div>
+            </div>
+            <p className="text-[11px] font-bold text-gray-500 leading-relaxed uppercase">{ex.description}</p>
+          </div>
         ))}
       </div>
-      <button
-        onClick={onGenerate}
-        disabled={selectedGroups.length === 0}
-        className="w-full bg-black text-white py-5 rounded-[28px] font-black text-sm shadow-2xl active:scale-95 transition-all disabled:opacity-30 disabled:active:scale-100 flex items-center justify-center gap-2 mt-4"
-      >
-        <Zap size={18} className="fill-white" /> Compute Routine
-      </button>
+    )}
+  </div>
+);
+
+const ClarificationModal: React.FC<{ question: string; onAnswer: (ans: string) => void; onApprox: () => void; onCancel: () => void }> = ({ question, onAnswer, onApprox, onCancel }) => {
+  const [answer, setAnswer] = useState('');
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-fade-in">
+      <div className="bg-white rounded-[48px] w-full max-sm p-10 space-y-8 shadow-2xl relative">
+        <button onClick={onCancel} className="absolute top-8 right-8 text-gray-300 hover:text-black transition-colors"><X size={24}/></button>
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto text-blue-500 shadow-inner"><HelpCircle size={32}/></div>
+          <h2 className="text-2xl font-black tracking-tight">Clarification Needed</h2>
+          <p className="text-sm font-bold text-gray-500 leading-relaxed uppercase">{question}</p>
+        </div>
+        <div className="space-y-3">
+          <input value={answer} onChange={e=>setAnswer(e.target.value)} placeholder="Enter details..." className="w-full p-5 rounded-2xl bg-gray-50 border-none font-bold text-sm shadow-inner" />
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <button onClick={onApprox} className="bg-gray-100 text-gray-500 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">Approximate</button>
+            <button onClick={()=>onAnswer(answer)} disabled={!answer.trim()} className="bg-black text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all disabled:opacity-40">Confirm</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
+
+// --- App Component ---
 
 const App: React.FC = () => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [isVerified, setIsVerified] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [view, setView] = useState<'home' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team' | 'wallet' | 'refer' | 'cashout' | 'upi_entry' | 'admin_users' | 'admin_user_edit' | 'admin_payments' | 'admin_transfers' | 'admin_dashboard' | 'workout_unlock' | 'workout_location' | 'workout_focus' | 'workout_plan' | 'update_profile'>('home');
+  const [view, setView] = useState<'home' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team' | 'wallet' | 'refer' | 'cashout' | 'upi_entry' | 'admin_dashboard' | 'workout_unlock' | 'workout_location' | 'workout_focus' | 'workout_plan' | 'update_profile'>('home');
   const [scans, setScans] = useState<(ScanHistoryItem & { isPending?: boolean; hasError?: boolean })[]>([]);
   const [showPremium, setShowPremium] = useState(false);
   const [analysis, setAnalysis] = useState<ScanHistoryItem | null>(null);
@@ -1109,169 +874,101 @@ const App: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toDateString());
   const [clarificationQuestion, setClarificationQuestion] = useState<string | null>(null);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
+  
   const [selectedLocation, setSelectedLocation] = useState<WorkoutLocation | null>(null);
   const [selectedMuscleGroups, setSelectedMuscleGroups] = useState<MuscleGroup[]>([]);
   const [currentRoutine, setCurrentRoutine] = useState<Exercise[]>([]);
   const [isGeneratingRoutine, setIsGeneratingRoutine] = useState(false);
   const [isUnlockingWorkout, setIsUnlockingWorkout] = useState(false);
-  const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [allPayments, setAllPayments] = useState<any[]>([]);
-  const [allTransfers, setAllTransfers] = useState<any[]>([]);
-  const [adminSearch, setAdminSearch] = useState('');
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const startCamera = useCallback(() => { setView('camera'); }, []);
 
+  // Camera stream management effect
   useEffect(() => {
     let stream: MediaStream | null = null;
-    if (view === 'camera') {
-      const initCamera = async () => {
+    const initCamera = async () => {
+      if (view === 'camera' && videoRef.current) {
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } });
-          if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
-        } catch (err) { console.error(err); setView('home'); }
-      };
-      initCamera();
-    }
-    return () => { if (stream) stream.getTracks().forEach(t => t.stop()); };
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+          });
+          videoRef.current.srcObject = stream;
+        } catch (err) {
+          console.error("Camera access denied:", err);
+          setView('home');
+          alert("Camera access is required for metabolic scans.");
+        }
+      }
+    };
+    initCamera();
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
   }, [view]);
 
   useEffect(() => {
-    const adminSession = localStorage.getItem('drfoodie_admin');
-    if (adminSession === 'true') { setIsAdmin(true); if (view === 'home') setView('admin_dashboard'); }
+    let interval: number;
     const unsub = onAuthStateChanged(auth, async (u) => {
-      setLoading(true);
       if (u) { 
         setUser(u); 
-        try {
-          await fetchProfile(u); 
-        } catch (err) {
-          console.error("Profile initialization error:", err);
-          if (!profile) setProfile({ isOnboarded: false } as UserProfile);
+        setIsVerified(u.emailVerified);
+        await fetchProfile(u); 
+        
+        if (!u.emailVerified) {
+          interval = window.setInterval(async () => {
+            await reload(u);
+            if (auth.currentUser?.emailVerified) {
+              setIsVerified(true);
+              clearInterval(interval);
+            }
+          }, 5000);
         }
       } 
-      else { setUser(null); setProfile(null); }
+      else { 
+        const adminStored = localStorage.getItem('drfoodie_admin');
+        if (adminStored === 'true') {
+          setIsAdmin(true);
+          setView('admin_dashboard');
+        } else {
+          setUser(null); 
+          setProfile(null); 
+          setIsVerified(false); 
+        }
+      }
       setLoading(false);
     });
-    return () => unsub();
+    return () => { unsub(); clearInterval(interval); };
   }, []);
-
-  useEffect(() => {
-    if (isAdmin) {
-      const unsubUsers = onSnapshot(collection(db, "profiles"), (snapshot) => {
-        const list: any[] = [];
-        snapshot.forEach(doc => list.push({ uid: doc.id, ...doc.data() }));
-        setAllUsers(list);
-      });
-      const unsubPayments = onSnapshot(query(collection(db, "payments"), orderBy("timestamp", "desc")), (snapshot) => {
-        const list: any[] = [];
-        snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-        setAllPayments(list);
-      });
-      const unsubTransfers = onSnapshot(query(collection(db, "transfers"), orderBy("timestamp", "desc")), (snapshot) => {
-        const list: any[] = [];
-        snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-        setAllTransfers(list);
-      });
-      return () => { unsubUsers(); unsubPayments(); unsubTransfers(); };
-    }
-  }, [isAdmin]);
-
-  const handlePendingReferral = async (uId: string, profileData: UserProfile) => {
-    const referralCode = localStorage.getItem(`pending_referral_${uId}`);
-    if (referralCode && !profileData.hasClaimedSignupReferral) {
-      try {
-        const q = query(collection(db, "profiles"), where("referralCode", "==", referralCode.toUpperCase()));
-        const snap = await getDocs(q);
-        
-        if (!snap.empty) {
-          const referrerDoc = snap.docs[0];
-          const referrerId = referrerDoc.id;
-          
-          if (referrerId !== uId) {
-            await runTransaction(db, async (tx) => {
-              tx.update(doc(db, "profiles", referrerId), { points: increment(REFERRAL_BONUS_SENDER) });
-              tx.update(doc(db, "profiles", uId), { 
-                points: increment(REFERRAL_BONUS_RECEIVER),
-                hasClaimedSignupReferral: true,
-                referredBy: referrerId
-              });
-            });
-          }
-        }
-      } catch (e) {
-        console.warn("Referral application skipped (permission or network):", e);
-      } finally {
-        localStorage.removeItem(`pending_referral_${uId}`);
-      }
-    }
-  };
 
   const fetchProfile = async (u: FirebaseUser) => {
     try {
       const docSnap = await getDoc(doc(db, "profiles", u.uid));
       if (docSnap.exists()) {
-        let pData = docSnap.data() as UserProfile;
-        if (pData.isDisabled) { 
-          alert("Node access terminated by protocol."); 
-          signOut(auth); 
-          return; 
-        }
-        
-        await handlePendingReferral(u.uid, pData);
-        
-        const todayStr = new Date().toDateString();
-        if (pData.lastLoginDate !== todayStr) {
-          pData.currentStreak = (pData.lastLoginDate === new Date(Date.now() - 86400000).toDateString()) ? (pData.currentStreak || 0) + 1 : 1;
-          pData.lastLoginDate = todayStr;
-          await updateDoc(doc(db, "profiles", u.uid), { 
-            currentStreak: pData.currentStreak, 
-            lastLoginDate: todayStr, 
-            email: u.email || '' 
-          });
-        }
-        if (pData.lastScanResetDate !== todayStr) { 
-          pData.scansUsedToday = 0; 
-          pData.lastScanResetDate = todayStr; 
-          await updateDoc(doc(db, "profiles", u.uid), { scansUsedToday: 0, lastScanResetDate: todayStr }); 
-        }
-        
-        const updatedSnap = await getDoc(doc(db, "profiles", u.uid));
-        setProfile(updatedSnap.data() as UserProfile);
-        
+        const pData = docSnap.data() as UserProfile;
+        setProfile(pData);
         const qScans = query(collection(db, "profiles", u.uid, "scans"), orderBy("timestamp", "desc"));
         const qs = await getDocs(qScans);
         const ls: ScanHistoryItem[] = [];
         qs.forEach(d => ls.push({ id: d.id, ...d.data() } as ScanHistoryItem));
         setScans(ls);
       } else {
-        const newCode = `INR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-        const newProfile: UserProfile = { 
-          isOnboarded: false, 
-          name: '', 
-          age: 0, 
-          gender: Gender.MALE, 
-          height: 0, 
-          weight: 0, 
-          targetWeight: 0, 
-          durationWeeks: 12, 
-          goal: Goal.MAINTAIN, 
-          referralCode: u.uid.substring(0,8).toUpperCase(), 
-          points: 0, 
-          uniqueTransferCode: newCode, 
-          currentStreak: 1, 
-          lastLoginDate: new Date().toDateString(), 
-          email: u.email || '',
-          isWorkoutUnlocked: false
-        };
-        setProfile(newProfile);
+        setProfile({ isOnboarded: false } as UserProfile);
       }
-    } catch (e) { 
-      console.error("Profile fetch error:", e); 
-      if (!profile) setProfile({ isOnboarded: false } as UserProfile);
-    }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleResendVerification = async () => {
+    if (!user) return;
+    setIsResending(true);
+    try { await sendEmailVerification(user); alert("Verification node dispatched to " + user.email); }
+    catch (e) { alert("Protocol delay. Please wait before retrying."); }
+    finally { setIsResending(false); }
   };
 
   const saveProfile = async (data: Partial<UserProfile>) => {
@@ -1281,57 +978,77 @@ const App: React.FC = () => {
       await setDoc(doc(db, "profiles", user.uid), updated, { merge: true });
       setProfile(updated as UserProfile);
       setView('home'); 
-    } catch (err) {
-      console.error("Save profile error:", err);
-      alert("Failed to sync metabolic metrics.");
-    }
+    } catch (err) { console.error(err); }
   };
 
-  const handleUpgrade = async () => {
-    if (!user || !profile) return;
+  const handleTransfer = async (code: string, coins: number) => {
+    if (!isVerified) { alert("Email verification required."); return; }
+    if (!user || !profile || !code || coins <= 0) return;
+    if ((profile.points || 0) < coins) { alert("Insufficient assets."); return; }
     try {
+      const q = query(collection(db, "profiles"), where("uniqueTransferCode", "==", code));
+      const snap = await getDocs(q);
+      if (snap.empty) { alert("Node not found."); return; }
+      const recipientDoc = snap.docs[0];
       await runTransaction(db, async (tx) => {
-        tx.update(doc(db, "profiles", user.uid), { isPremium: true }); // Strictly premium only
-        if (profile.referredBy) {
-          tx.update(doc(db, "profiles", profile.referredBy), { points: increment(REFERRAL_BONUS_PREMIUM) });
-        }
-        tx.set(doc(collection(db, "payments")), { 
-          uid: user.uid, 
-          userName: profile.name, 
-          amount: 49, 
-          timestamp: Timestamp.now() 
+        tx.update(doc(db, "profiles", user.uid), { points: increment(-coins) });
+        tx.update(doc(db, "profiles", recipientDoc.id), { points: increment(coins) });
+        
+        // Log transfer for Admin visibility
+        const transferRef = doc(collection(db, "transfers"));
+        tx.set(transferRef, {
+          fromId: user.uid,
+          fromName: profile.name || 'Anonymous Agent',
+          toId: recipientDoc.id,
+          toCode: code,
+          amount: coins,
+          timestamp: Timestamp.now()
         });
       });
-      setProfile(prev => prev ? { ...prev, isPremium: true } : null);
-      setShowPremium(false);
-      alert("Pro Protocol Established.");
-    } catch (e) {
-      console.error("Upgrade error:", e);
-      alert("Upgrade failed. Check network stability.");
-    }
+      setProfile(prev => prev ? { ...prev, points: (prev.points || 0) - coins } : null);
+      alert("Transfer authorized.");
+    } catch (e) { alert("Vault uplink failed."); }
   };
 
   const handleUnlockWorkout = async () => {
     if (!user || !profile) return;
-    if ((profile.points || 0) < WORKOUT_UNLOCK_COST) {
-       setView('wallet');
-       return;
-    }
+    if ((profile.points || 0) < 500) return;
     setIsUnlockingWorkout(true);
     try {
-       await runTransaction(db, async (tx) => {
-          tx.update(doc(db, "profiles", user.uid), { 
-             points: increment(-WORKOUT_UNLOCK_COST),
-             isWorkoutUnlocked: true
-          });
-       });
-       setProfile(prev => prev ? { ...prev, points: (prev.points || 0) - WORKOUT_UNLOCK_COST, isWorkoutUnlocked: true } : null);
-       setView('workout_location');
-       alert("Training module authorized.");
+      await updateDoc(doc(db, "profiles", user.uid), { isWorkoutUnlocked: true, points: increment(-500) });
+      setProfile(prev => prev ? { ...prev, isWorkoutUnlocked: true, points: (prev.points || 0) - 500 } : null);
+      setView('workout_location');
+    } catch (e) { alert("Node sync error."); }
+    finally { setIsUnlockingWorkout(false); }
+  };
+
+  const handleGenerateWorkout = async () => {
+    if (!profile || !selectedLocation || selectedMuscleGroups.length === 0) return;
+    setIsGeneratingRoutine(true);
+    setView('workout_plan');
+    try {
+      const routine = await generateWorkoutRoutine(selectedLocation, selectedMuscleGroups, profile);
+      setCurrentRoutine(routine);
     } catch (e) {
-       alert("Authorization failed.");
+      alert("Failed to generate workout routine. Please try again.");
+      setView('workout_focus');
     } finally {
-       setIsUnlockingWorkout(false);
+      setIsGeneratingRoutine(false);
+    }
+  };
+
+  const captureImage = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0);
+        const base64 = canvas.toDataURL('image/jpeg', 0.8);
+        processImage(base64);
+      }
     }
   };
 
@@ -1340,272 +1057,158 @@ const App: React.FC = () => {
     if (!profile.isPremium && (profile.scansUsedToday || 0) >= MAX_FREE_SCANS_PER_DAY) { setShowPremium(true); return; }
     
     const tempId = `temp-${Date.now()}`;
-    let optimizedBase64 = base64;
-    
-    try {
-      optimizedBase64 = await resizeImage(base64);
-    } catch (e) {
-      console.warn("Resize failed, using original source:", e);
-    }
-    
-    const pendingItem: any = {
-      id: tempId,
-      imageUrl: optimizedBase64,
-      timestamp: new Date().toISOString(),
-      isPending: true,
-      foodName: 'Analysis in Progress...',
-      calories: 0, protein: 0, carbs: 0, fat: 0, healthScore: 0,
-      microAnalysis: 'Scanning metabolic nodes...',
-      mealType: 'Snack',
-      alternatives: []
-    };
-
-    setScans(prev => [pendingItem, ...prev]);
-    setSelectedDate(new Date().toDateString());
+    setScans(prev => [{ id: tempId, imageUrl: base64, timestamp: new Date().toISOString(), isPending: true } as any, ...prev]);
     setView('home');
 
     try {
-      const base64Data = optimizedBase64.includes(',') ? optimizedBase64.split(',')[1] : optimizedBase64;
-      const result = await analyzeFoodImage(base64Data, profile, clarification);
-      
-      if (result.needsClarification) { 
-        setClarificationQuestion(result.clarificationQuestion); 
-        setPendingImage(optimizedBase64); 
-        setScans(prev => prev.filter(s => s.id !== tempId));
-        return; 
-      }
-      
-      const scanItem: Omit<ScanHistoryItem, 'id'> = { 
-        ...result, 
-        imageUrl: optimizedBase64, 
-        timestamp: new Date().toISOString(),
-        mealType: result.mealType || 'Snack',
-        alternatives: result.alternatives || []
-      };
-      
+      const result = await analyzeFoodImage(base64.split(',')[1], profile, clarification);
+      if (result.needsClarification) { setClarificationQuestion(result.clarificationQuestion); setPendingImage(base64); setScans(prev => prev.filter(s => s.id !== tempId)); return; }
+      const scanItem = { ...result, imageUrl: base64, timestamp: new Date().toISOString() };
       const docRef = await addDoc(collection(db, "profiles", user.uid, "scans"), scanItem);
-      const newScan = { id: docRef.id, ...scanItem } as ScanHistoryItem;
-      
-      await updateDoc(doc(db, "profiles", user.uid), { 
-        scansUsedToday: increment(1), 
-        points: increment(COINS_PER_SCAN) 
-      });
-      
-      setScans(prev => prev.map(s => s.id === tempId ? newScan : s));
+      await updateDoc(doc(db, "profiles", user.uid), { scansUsedToday: increment(1), points: increment(COINS_PER_SCAN) });
+      setScans(prev => prev.map(s => s.id === tempId ? { id: docRef.id, ...scanItem } : s));
       setProfile(prev => prev ? { ...prev, scansUsedToday: (prev.scansUsedToday || 0) + 1, points: (prev.points || 0) + COINS_PER_SCAN } : null);
-    } catch (err) { 
-      console.error("Background Scan Error:", err);
-      setScans(prev => prev.map(s => s.id === tempId ? { ...s, isPending: false, hasError: true, foodName: 'Scan Failed' } : s));
-    }
-  };
-
-  const handleTransfer = async (code: string, coins: number) => {
-    if (!user || !profile || !code || coins <= 0) return;
-    if ((profile.points || 0) < coins) { alert("Insufficient assets."); return; }
-    try {
-      const q = query(collection(db, "profiles"), where("uniqueTransferCode", "==", code));
-      const snap = await getDocs(q);
-      if (snap.empty) { alert("Recipient node not found."); return; }
-      const recipientDoc = snap.docs[0];
-      if (recipientDoc.id === user.uid) { alert("Loopback rejected."); return; }
-      await runTransaction(db, async (tx) => {
-        tx.update(doc(db, "profiles", user.uid), { points: increment(-coins) });
-        tx.update(doc(db, "profiles", recipientDoc.id), { points: increment(coins) });
-        tx.set(doc(collection(db, "transfers")), { 
-          senderId: user.uid, 
-          senderName: profile.name, 
-          recipientCode: code, 
-          coins, 
-          timestamp: Timestamp.now() 
-        });
-      });
-      setProfile(prev => prev ? { ...prev, points: (prev.points || 0) - coins } : null);
-      alert("Peer transfer authorized.");
-    } catch (e) { alert("Vault node unreachable."); }
-  };
-
-  const handleSaveUpi = async (upiId: string) => {
-    if (!user) return;
-    try {
-      await updateDoc(doc(db, "profiles", user.uid), { upiId });
-      setProfile(prev => prev ? { ...prev, upiId } : null);
-      setView('cashout');
-      alert("Terminal node synced successfully.");
-    } catch (e) {
-      alert("Terminal sync failed.");
-    }
-  };
-
-  const adminUpdateUser = async (uid: string, data: Partial<UserProfile>) => {
-    try {
-      await updateDoc(doc(db, "profiles", uid), data);
-      alert("Node metrics updated.");
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
-  };
-
-  const captureImage = () => {
-    if (videoRef.current && canvasRef.current) {
-      const context = canvasRef.current.getContext('2d');
-      if (context) {
-        canvasRef.current.width = videoRef.current.videoWidth;
-        canvasRef.current.height = videoRef.current.videoHeight;
-        context.drawImage(videoRef.current, 0, 0);
-        processImage(canvasRef.current.toDataURL('image/jpeg', 0.7));
-      }
-    }
-  };
-
-  const handleGenerateWorkout = async () => {
-    if (!selectedLocation || !profile) {
-      alert("Neural nodes recalibrating. Try again.");
-      return;
-    }
-    
-    // Switch to plan view with loading indicator
-    setCurrentRoutine([]);
-    setIsGeneratingRoutine(true); 
-    setView('workout_plan'); 
-    
-    try { 
-      const r = await generateWorkoutRoutine(selectedLocation, selectedMuscleGroups, profile); 
-      if (!r || r.length === 0) {
-        throw new Error("Empty routine returned");
-      }
-      setCurrentRoutine(r); 
-    } catch (e) { 
-      console.error("Workout generation crash:", e);
-      alert("Metabolic uplink timed out. Retrying link...");
-      setView('workout_focus'); 
-    } finally { 
-      setIsGeneratingRoutine(false); 
-    } 
+    } catch (err) { setScans(prev => prev.filter(s => s.id !== tempId)); }
   };
 
   const currentCalTarget = useMemo(() => {
     if (!profile) return 2000;
-    const s = profile.gender === Gender.FEMALE ? -161 : 5;
-    const bmr = (10 * profile.weight) + (6.25 * profile.height) - (5 * (profile.age || 25)) + s;
-    const maintenance = Math.round(bmr * 1.375);
-    return profile.goal === Goal.LOSE_WEIGHT ? maintenance - 500 : profile.goal === Goal.GAIN_WEIGHT ? maintenance + 500 : maintenance;
+    const bmr = (10 * profile.weight) + (6.25 * profile.height) - (5 * (profile.age || 25)) + (profile.gender === Gender.FEMALE ? -161 : 5);
+    const m = Math.round(bmr * 1.375);
+    return profile.goal === Goal.LOSE_WEIGHT ? m - 500 : profile.goal === Goal.GAIN_WEIGHT ? m + 500 : m;
   }, [profile]);
 
-  if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><Loader2 className="animate-spin text-black/20" size={36}/></div>;
-  if (!isAdmin && !user) return <Auth onAdminLogin={(status) => { setIsAdmin(status); if(status) { localStorage.setItem('drfoodie_admin', 'true'); setView('admin_dashboard'); } }} />;
-  if (!isAdmin && user && profile && !profile.isOnboarded) return <Onboarding onComplete={p => saveProfile({ ...p, isOnboarded: true, referralCode: user.uid.substring(0,8).toUpperCase() })} />;
+  if (loading) return <div className="min-h-screen bg-[#F2F2F7] flex items-center justify-center"><Loader2 className="animate-spin text-black/10" size={48}/></div>;
+  if (isAdmin) return <AdminDashboard onLogout={() => { setIsAdmin(false); localStorage.removeItem('drfoodie_admin'); setView('home'); }} />;
+  if (!user) return <Auth onAdminLogin={(s) => { setIsAdmin(s); localStorage.setItem('drfoodie_admin', 'true'); setView('admin_dashboard'); }} />;
+  if (user && profile && !profile.isOnboarded) return <Onboarding onComplete={p => saveProfile({ ...p, isOnboarded: true, referralCode: user.uid.substring(0,8).toUpperCase(), uniqueTransferCode: `INR-${Math.random().toString(36).substring(2,8).toUpperCase()}` })} />;
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-[#F2F2F7] text-black relative shadow-2xl flex flex-col font-sans overflow-hidden">
       <canvas ref={canvasRef} className="hidden" />
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = () => processImage(r.result as string); r.readAsDataURL(f); } }} />
+      
       <div className="flex-1 overflow-hidden h-full">
-        {isAdmin ? <AdminPanel view={view} setView={setView} allUsers={allUsers} allPayments={allPayments} allTransfers={allTransfers} adminSearch={adminSearch} setAdminSearch={setAdminSearch} setIsAdmin={setIsAdmin} onUpdateUser={adminUpdateUser} /> : (
-          <div className="animate-fade-in px-0 h-full overflow-hidden">
-            {view === 'home' && (
-              <div className="pt-5 h-full overflow-y-auto no-scrollbar pb-32 px-5">
-                <header className="flex justify-between items-center mb-6">
-                  <div className="flex items-center gap-2"><div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center shadow-lg"><Lightning size={16} className="text-white fill-white"/></div><h1 className="text-xl font-black tracking-tighter">Dr Foodie</h1></div>
-                  <div className="flex gap-2"><div className="bg-white px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm border border-gray-100"><Flame size={12} className="text-orange-500 fill-orange-500"/><span className="text-[10px] font-black">{profile?.currentStreak || 0}</span></div><button onClick={()=>setShowPremium(true)} className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase shadow-sm tracking-widest ${profile?.isPremium ? 'bg-black text-yellow-400' : 'bg-white text-black'}`}>{profile?.isPremium ? 'PRO' : `${MAX_FREE_SCANS_PER_DAY - (profile?.scansUsedToday || 0)} Free`}</button></div>
-                </header>
-                <div className="flex justify-between mb-6 overflow-x-auto no-scrollbar py-2 gap-3">
-                  {Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (3 - i)); return d; }).map((d, i) => (
-                    <button key={i} onClick={() => setSelectedDate(d.toDateString())} className={`flex flex-col items-center min-w-[52px] py-4 rounded-[22px] transition-all duration-300 ${d.toDateString() === selectedDate ? 'bg-black text-white shadow-xl scale-105' : 'bg-white text-gray-300 border border-gray-50'}`}><span className="text-[9px] font-black uppercase mb-1">{d.toLocaleDateString('en-US',{weekday:'short'}).charAt(0)}</span><span className="text-base font-black">{d.getDate()}</span></button>
-                  ))}
+        <div className="animate-fade-in px-0 h-full overflow-hidden">
+          {view === 'home' && (
+            <div className="pt-6 h-full overflow-y-auto no-scrollbar pb-32 px-6">
+              <header className="flex justify-between items-center mb-8">
+                <div className="flex items-center gap-3"><div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center shadow-lg"><Lightning size={20} className="text-white fill-white"/></div><h1 className="text-2xl font-black tracking-tighter">Dr Foodie</h1></div>
+                <div className="flex gap-2.5">
+                   <div className="bg-white px-4 py-2 rounded-full flex items-center gap-2 shadow-sm border border-gray-100"><Flame size={14} className="text-orange-500 fill-orange-500"/><span className="text-[11px] font-black">{profile?.currentStreak || 0}</span></div>
+                   <button onClick={()=>setShowPremium(true)} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase shadow-sm tracking-[0.1em] ${profile?.isPremium ? 'bg-black text-yellow-400' : 'bg-white text-black'}`}>{profile?.isPremium ? 'PRO' : 'GO PRO'}</button>
                 </div>
-                <div className="bg-white p-8 rounded-[40px] shadow-card mb-6 flex items-center justify-between border border-gray-100"><div className="flex-1"><div className="flex items-baseline gap-1"><span className="text-5xl font-black tracking-tighter leading-none">{scans.filter(s => new Date(s.timestamp).toDateString() === selectedDate).reduce((acc, s) => acc + (s.calories || 0), 0)}</span><span className="text-base text-gray-300 font-bold">/{currentCalTarget}</span></div><div className="text-[8px] text-gray-400 font-black uppercase tracking-[0.3em] mt-3">ENERGY BUDGET</div></div><Activity className="text-black opacity-5" size={70} /></div>
-                <div className="space-y-3">
-                  {scans.filter(s => new Date(s.timestamp).toDateString() === selectedDate).length === 0 ? <div className="text-center py-16 text-gray-300 bg-white rounded-[40px] border-2 border-dashed border-gray-100 flex flex-col items-center gap-3 cursor-pointer active:scale-[0.98]" onClick={startCamera}><Camera size={36} className="opacity-10"/><p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Start New Scan</p></div> : scans.filter(s => new Date(s.timestamp).toDateString() === selectedDate).map(s => (
-                    s.isPending ? (
-                      <PendingScanCard key={s.id} imageUrl={s.imageUrl!} />
-                    ) : (
-                      <div key={s.id} onClick={()=>{setAnalysis(s); setView('analysis')}} className={`bg-white p-4 rounded-[30px] flex gap-4 shadow-card items-center border border-gray-50 active:scale-95 transition-all ${s.hasError ? 'border-red-100' : ''}`}>
-                        <img src={s.imageUrl} className={`w-14 h-14 rounded-2xl object-cover shadow-sm ${s.hasError ? 'grayscale' : ''}`} />
-                        <div className="flex-1 min-w-0">
-                          <div className={`font-black text-sm tracking-tight truncate ${s.hasError ? 'text-red-500' : ''}`}>{s.foodName}</div>
-                          <div className="text-[9px] text-gray-400 font-black uppercase tracking-widest mt-1">
-                            {s.hasError ? 'Analysis Failed' : `${s.calories} kcal • ${s.protein}g P`}
-                          </div>
-                        </div>
-                        {s.hasError ? <AlertCircle size={16} className="text-red-400" /> : <ChevronRight size={16} className="text-gray-200 flex-shrink-0"/>}
+              </header>
+
+              {!isVerified && <VerificationBanner onResend={handleResendVerification} isResending={isResending} />}
+
+              <div className="flex justify-between mb-8 overflow-x-auto no-scrollbar py-2 gap-4">
+                {Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (3 - i)); return d; }).map((d, i) => (
+                  <button key={i} onClick={() => setSelectedDate(d.toDateString())} className={`flex flex-col items-center min-w-[56px] py-5 rounded-[24px] transition-all duration-300 ${d.toDateString() === selectedDate ? 'bg-black text-white shadow-2xl scale-110' : 'bg-white text-gray-200 border border-gray-50'}`}>
+                    <span className="text-[9px] font-black uppercase mb-1.5 opacity-60">{d.toLocaleDateString('en-US',{weekday:'short'}).charAt(0)}</span>
+                    <span className="text-lg font-black">{d.getDate()}</span>
+                  </button>
+                ))}
+              </div>
+              
+              <div className="bg-white p-10 rounded-[48px] shadow-card mb-8 flex items-center justify-between border border-gray-100 relative overflow-hidden">
+                <div className="flex-1 relative z-10">
+                  <div className="flex items-baseline gap-1.5 mb-1.5">
+                    <span className="text-6xl font-black tracking-tighter leading-none">{scans.filter(s => new Date(s.timestamp).toDateString() === selectedDate).reduce((acc, s) => acc + (s.calories || 0), 0)}</span>
+                    <span className="text-xl text-gray-200 font-black">/{currentCalTarget}</span>
+                  </div>
+                  <div className="text-[9px] text-gray-300 font-black uppercase tracking-[0.4em]">ENERGY BUDGET</div>
+                </div>
+                <div className="absolute right-8 top-1/2 -translate-y-1/2 opacity-5">
+                   <svg width="120" height="80" viewBox="0 0 120 80" fill="none"><path d="M0 40C20 40 20 10 40 10C60 10 60 70 80 70C100 70 100 40 120 40" stroke="black" strokeWidth="8" strokeLinecap="round"/></svg>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                {scans.filter(s => new Date(s.timestamp).toDateString() === selectedDate).length === 0 ? (
+                  <div className="text-center py-20 text-gray-200 bg-white rounded-[48px] border-2 border-dashed border-gray-100 flex flex-col items-center gap-4 cursor-pointer" onClick={startCamera}>
+                    <Camera size={44} className="opacity-10"/><p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">ESTABLISH NEW SCAN</p>
+                  </div>
+                ) : scans.filter(s => new Date(s.timestamp).toDateString() === selectedDate).map(s => (
+                  s.isPending ? <PendingScanCard key={s.id} imageUrl={s.imageUrl!} /> : (
+                    <div key={s.id} onClick={()=>{setAnalysis(s); setView('analysis')}} className="bg-white p-5 rounded-[40px] flex gap-5 shadow-card items-center border border-gray-100 active:scale-95 transition-all">
+                      <img src={s.imageUrl} className="w-16 h-16 rounded-[24px] object-cover shadow-sm" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-black text-base tracking-tight truncate leading-tight">{s.foodName}</div>
+                        <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1.5">{s.calories} KCAL • {s.protein}G P</div>
                       </div>
-                    )
-                  ))}
-                </div>
+                      <ChevronRight size={18} className="text-gray-100 mr-2"/>
+                    </div>
+                  )
+                ))}
               </div>
-            )}
-            {view === 'stats' && <StatsView scans={scans} currentCalTarget={currentCalTarget} profile={profile} onBack={() => setView('home')} />}
-            {view === 'settings' && (
-              <div className="pt-6 space-y-6 animate-fade-in pb-32 px-5 h-full overflow-y-auto no-scrollbar bg-[#F2F2F7]">
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setView('home')} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
-                  <h1 className="text-2xl font-black tracking-tight text-black">Control</h1>
-                </div>
-                <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 flex items-center gap-4">
-                   <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center border border-gray-100"><UserIcon size={24} className="text-black/20" /></div>
-                   <div>
-                      <h2 className="text-xl font-black">{profile?.name || 'Agent'}</h2>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{profile?.goal}</p>
-                   </div>
-                </div>
-                <div className="space-y-2">
-                   {[
-                     { icon: <Edit3 size={18}/>, label: 'Update Metrics', action: () => setView('update_profile') },
-                     { icon: <Banknote size={18}/>, label: 'Cashout Rewards', action: () => {
-                        if (profile?.upiId) setView('cashout');
-                        else setView('upi_entry');
-                     }},
-                     { icon: <WalletIcon size={18}/>, label: 'Vault Access', action: () => setView('wallet') },
-                     { icon: <Gift size={18}/>, label: 'Referral Nodes', action: () => setView('refer') },
-                     { icon: <Crown size={18}/>, label: 'Go Pro', action: () => setShowPremium(true), hidden: profile?.isPremium },
-                     { icon: <Users size={18}/>, label: 'Team Info', action: () => setView('team') },
-                   ].filter(i => !i.hidden).map((item, i) => (
-                     <button key={i} onClick={item.action} className="w-full bg-white p-5 rounded-[28px] flex items-center justify-between border border-gray-50 shadow-sm active:scale-95 transition-all">
-                        <div className="flex items-center gap-4">
-                           <div className="text-black/40">{item.icon}</div>
-                           <span className="text-sm font-black text-gray-700">{item.label}</span>
-                        </div>
-                        <ChevronRight size={16} className="text-gray-200" />
-                     </button>
-                   ))}
-                </div>
-                <button onClick={() => signOut(auth)} className="w-full py-5 rounded-[28px] flex items-center justify-center gap-2 text-red-500 font-black text-xs uppercase tracking-widest mt-4">
-                   <LogOut size={16}/> Terminate Session
-                </button>
+            </div>
+          )}
+          
+          {view === 'stats' && <StatsView scans={scans} currentCalTarget={currentCalTarget} profile={profile} onBack={() => setView('home')} />}
+          
+          {view === 'settings' && (
+            <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+              <div className="flex items-center gap-3">
+                <button onClick={() => setView('home')} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+                <h1 className="text-2xl font-black tracking-tight text-black">Control</h1>
               </div>
-            )}
-            {view === 'update_profile' && <Onboarding onComplete={saveProfile} initialData={profile} onBack={() => setView('settings')} />}
-            {view === 'team' && <TeamSection onBack={() => setView('settings')} />}
-            {view === 'wallet' && <WalletForm profile={profile} onTransfer={handleTransfer} onBack={() => setView('settings')} />}
-            {view === 'refer' && <ReferralView profile={profile} onBack={() => setView('settings')} />}
-            {view === 'upi_entry' && <UPIEntryView onSave={handleSaveUpi} onBack={() => setView('settings')} />}
-            {view === 'cashout' && <CashoutView profile={profile} onBack={() => setView('settings')} />}
-            {view === 'workout_unlock' && <UnlockWorkoutView currentGems={profile?.points || 0} isUnlocking={isUnlockingWorkout} onUnlock={handleUnlockWorkout} onGoToWallet={() => setView('wallet')} onBack={() => setView('home')} />}
-            {view === 'workout_location' && <WorkoutLocationView onBack={() => setView('home')} onSelect={(loc) => { setSelectedLocation(loc); setView('workout_focus'); }} />}
-            {view === 'workout_focus' && <WorkoutFocusView location={selectedLocation!} selectedGroups={selectedMuscleGroups} onToggle={(g)=>setSelectedMuscleGroups(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev, g])} onGenerate={handleGenerateWorkout} onBack={() => setView('workout_location')} />}
-            {view === 'workout_plan' && <WorkoutPlanView routine={currentRoutine} isGenerating={isGeneratingRoutine} onBack={() => setView('workout_focus')} />}
-            {view === 'analysis' && <AnalysisDetailView analysis={analysis} isAnalyzing={false} onBack={() => setView('home')} onDelete={async () => { if(confirm("Delete record?")) { await deleteDoc(doc(db, "profiles", user!.uid, "scans", analysis!.id)); setScans(prev => prev.filter(s => s.id !== analysis!.id)); setView('home'); } }} />}
-          </div>
-        )}
+
+              <div className="bg-white p-10 rounded-[48px] shadow-card border border-gray-100 flex items-center gap-6">
+                 <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center border border-gray-100"><UserIcon size={32} className="text-black/10" /></div>
+                 <div><h2 className="text-2xl font-black tracking-tighter">{profile?.name || 'AGENT'}</h2><p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{profile?.goal}</p></div>
+              </div>
+
+              <div className="space-y-3">
+                 {[
+                   { icon: <Edit3 size={18}/>, label: 'Update Metrics', action: () => setView('update_profile') },
+                   { icon: <Banknote size={18}/>, label: 'Cashout Rewards', action: () => setView('cashout') },
+                   { icon: <WalletIcon size={18}/>, label: 'Vault Access', action: () => setView('wallet') },
+                   { icon: <Gift size={18}/>, label: 'Referral Nodes', action: () => setView('refer') },
+                   { icon: <Users size={18}/>, label: 'Team Info', action: () => setView('team') },
+                 ].map((item, i) => (
+                   <button key={i} onClick={item.action} className="w-full bg-white p-6 rounded-[32px] flex items-center justify-between border border-gray-50 shadow-sm active:scale-95 transition-all">
+                      <div className="flex items-center gap-4"><div className="text-black/30">{item.icon}</div><span className="text-[15px] font-black text-gray-700 tracking-tight">{item.label}</span></div>
+                      <ChevronRight size={18} className="text-gray-100" />
+                   </button>
+                 ))}
+              </div>
+              <button onClick={() => signOut(auth)} className="w-full py-6 text-red-500 font-black text-[11px] uppercase tracking-[0.3em] flex items-center justify-center gap-2 mt-4"><LogOut size={16}/> Terminate Session</button>
+            </div>
+          )}
+
+          {view === 'wallet' && <VaultView profile={profile} onTransfer={handleTransfer} onBack={() => setView('settings')} isVerified={isVerified} />}
+          {view === 'refer' && <ReferralView profile={profile} onBack={() => setView('settings')} isVerified={isVerified} />}
+          {view === 'cashout' && <CashoutView profile={profile} onBack={() => setView('settings')} onManageUpi={() => setView('upi_entry')} isVerified={isVerified} />}
+          {view === 'upi_entry' && <UPIEntryView onSave={(id)=>{ updateDoc(doc(db,"profiles",user!.uid),{upiId:id}); setProfile(p=>p?({...p,upiId:id}):null); setView('cashout'); }} onBack={() => setView('cashout')} />}
+          {view === 'update_profile' && <Onboarding onComplete={saveProfile} initialData={profile} onBack={() => setView('settings')} />}
+          {view === 'team' && <TeamSection onBack={() => setView('settings')} />}
+          {view === 'workout_unlock' && <UnlockWorkoutView currentGems={profile?.points || 0} isUnlocking={isUnlockingWorkout} onUnlock={handleUnlockWorkout} onGoToWallet={() => setView('wallet')} onBack={() => setView('home')} />}
+          {view === 'workout_location' && <WorkoutLocationView onBack={() => setView('home')} onSelect={(loc) => { setSelectedLocation(loc); setView('workout_focus'); }} />}
+          {view === 'workout_focus' && <WorkoutFocusView location={selectedLocation!} selectedGroups={selectedMuscleGroups} onToggle={(g)=>setSelectedMuscleGroups(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev, g])} onGenerate={()=>handleGenerateWorkout()} onBack={() => setView('workout_location')} />}
+          {view === 'workout_plan' && <WorkoutPlanView routine={currentRoutine} isGenerating={isGeneratingRoutine} onBack={() => setView('workout_focus')} />}
+          {view === 'analysis' && <AnalysisDetailView analysis={analysis} isAnalyzing={false} onBack={() => setView('home')} onDelete={async () => { if(confirm("Discard node data?")) { await deleteDoc(doc(db,"profiles",user!.uid,"scans",analysis!.id)); setScans(prev=>prev.filter(s=>s.id!==analysis!.id)); setView('home'); } }} />}
+        </div>
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-gray-100 p-4 pb-8 flex justify-between items-center z-40 max-w-md mx-auto px-8 shadow-floating">
-        <button onClick={()=>{setView(isAdmin ? 'admin_dashboard' : 'home')}} className={`transition-all ${(view==='home' || view==='admin_dashboard')?'text-black scale-110':'text-black/20'}`}><Home size={22}/></button>
-        <button onClick={()=>{ if (isAdmin) setView('admin_dashboard'); else if (profile?.isWorkoutUnlocked) setView('workout_location'); else setView('workout_unlock'); }} className={`transition-all ${view.startsWith('workout')?'text-black scale-110':'text-black/20'}`}>{isAdmin ? <DollarSign size={22}/> : <Dumbbell size={22}/>}</button>
-        <div className="relative -mt-12 flex justify-center z-50"><button onClick={()=>{ if (isAdmin) setView('admin_users'); else startCamera(); }} className="w-16 h-16 bg-black rounded-full flex items-center justify-center text-white border-[6px] border-[#F2F2F7] shadow-2xl active:scale-90 transition-all">{isAdmin ? <Users size={24}/> : <Plus size={32}/>}</button></div>
-        <button onClick={()=>{ if (!isAdmin) setView('stats'); }} className={`transition-all ${view==='stats'?'text-black scale-110':'text-black/20'}`}><BarChart2 size={22}/></button>
-        <button onClick={()=>setView('settings')} className={`transition-all ${view==='settings' || view === 'team' || view === 'cashout' || view === 'upi_entry' ?'text-black scale-110':'text-black/20'}`}><Settings size={22}/></button>
-      </nav>
+      {!isAdmin && (
+        <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-3xl border-t border-gray-100 p-5 pb-9 flex justify-between items-center z-40 max-w-md mx-auto px-10 shadow-floating">
+          <button onClick={()=>{setView('home')}} className={`transition-all ${view==='home'?'text-black scale-125':'text-black/15'}`}><Home size={22} strokeWidth={2.5}/></button>
+          <button onClick={()=>{ if (profile?.isWorkoutUnlocked) setView('workout_location'); else setView('workout_unlock'); }} className={`transition-all ${view.startsWith('workout')?'text-black scale-125':'text-black/15'}`}><Dumbbell size={22} strokeWidth={2.5}/></button>
+          <div className="relative -mt-14 flex justify-center z-50"><button onClick={startCamera} className="w-18 h-18 bg-black rounded-full flex items-center justify-center text-white border-[7px] border-[#F2F2F7] shadow-2xl active:scale-90 transition-all"><Plus size={34} strokeWidth={3}/></button></div>
+          <button onClick={()=>{setView('stats')}} className={`transition-all ${view==='stats'?'text-black scale-125':'text-black/15'}`}><BarChart2 size={22} strokeWidth={2.5}/></button>
+          <button onClick={()=>setView('settings')} className={`transition-all ${['settings', 'wallet', 'refer', 'cashout', 'team', 'upi_entry', 'update_profile'].includes(view)?'text-black scale-125':'text-black/15'}`}><Settings size={22} strokeWidth={2.5}/></button>
+        </nav>
+      )}
 
       {clarificationQuestion && pendingImage && <ClarificationModal question={clarificationQuestion} onAnswer={(ans) => processImage(pendingImage, ans)} onApprox={() => processImage(pendingImage, "Approximate")} onCancel={() => setClarificationQuestion(null)} />}
-      <PremiumModal isOpen={showPremium} onClose={()=>setShowPremium(false)} onUpgrade={handleUpgrade} />
+      <PremiumModal isOpen={showPremium} onClose={()=>setShowPremium(false)} onUpgrade={()=>{ if(user) { updateDoc(doc(db,"profiles",user.uid),{isPremium:true}); setProfile(p=>p?({...p,isPremium:true}):null); setShowPremium(false); } }} />
       {view === 'camera' && (
           <div className="fixed inset-0 z-[100] bg-black animate-fade-in flex flex-col">
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             <div className="absolute inset-0 flex flex-col justify-between p-8">
-              <div className="flex justify-between pt-8"><button onClick={() => setView('home')} className="p-4 bg-white/10 backdrop-blur-lg rounded-full text-white"><X size={28}/></button><button onClick={() => fileInputRef.current?.click()} className="p-4 bg-white/10 backdrop-blur-lg rounded-full text-white"><Image size={28}/></button></div>
-              <div className="flex justify-center pb-16"><button onClick={captureImage} className="w-24 h-24 bg-white rounded-full border-[8px] border-white/20 flex items-center justify-center active:scale-90 shadow-2xl"><div className="w-16 h-16 bg-black rounded-full flex items-center justify-center text-white"><ScanLine size={30}/></div></button></div>
+              <div className="flex justify-between pt-10"><button onClick={() => setView('home')} className="p-5 bg-white/10 backdrop-blur-xl rounded-3xl text-white border border-white/10 active:scale-90"><X size={28}/></button><button onClick={() => fileInputRef.current?.click()} className="p-5 bg-white/10 backdrop-blur-xl rounded-3xl text-white border border-white/10 active:scale-90"><Image size={28}/></button></div>
+              <div className="flex justify-center pb-20"><button onClick={captureImage} className="w-28 h-28 bg-white rounded-full border-[10px] border-white/20 flex items-center justify-center active:scale-90 shadow-2xl transition-all"><div className="w-20 h-20 bg-black rounded-full flex items-center justify-center text-white"><ScanLine size={32}/></div></button></div>
             </div>
           </div>
       )}
