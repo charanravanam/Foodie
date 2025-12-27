@@ -9,13 +9,14 @@ import {
   Mail, Key, Share, Sparkle, Ban, UserX, Gem, Lock, Zap as Lightning,
   Shield, Bell, HelpCircle, Info, ChevronDown, Image, MessageCircle, Trash2,
   Edit3, CreditCard, Save, AlertCircle, Banknote, Wallet, Smartphone,
-  RefreshCw
+  RefreshCw, BarChart3, LineChart, MoveUpRight, MoveDownLeft
 } from 'lucide-react';
 import { onAuthStateChanged, signOut, sendPasswordResetEmail, sendEmailVerification, reload } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { 
   doc, getDoc, setDoc, collection, query, orderBy, getDocs, addDoc, deleteDoc, where, updateDoc, increment, onSnapshot, Timestamp, runTransaction, limit
 } from 'firebase/firestore';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Onboarding from './components/Onboarding';
 import PremiumModal from './components/PremiumModal';
 import Auth from './components/Auth';
@@ -76,6 +77,169 @@ const formatCoins = (num: number) => {
   if (num < 1000) return num.toString();
   if (num < 1000000) return (num / 1000).toFixed(1) + 'k';
   return (num / 1000000).toFixed(1) + 'M';
+};
+
+// --- Crypto Market Component ---
+
+const CryptoMarketView: React.FC<{ profile: UserProfile | null; scans: ScanHistoryItem[]; currentCalTarget: number; onBack: () => void }> = ({ profile, scans, currentCalTarget, onBack }) => {
+  const [fdyPrice, setFdyPrice] = useState(8.00);
+  const [history, setHistory] = useState<{ time: string; price: number }[]>([]);
+
+  const isUptrend = useMemo(() => {
+    if (history.length < 2) return true;
+    return history[history.length - 1].price >= history[history.length - 2].price;
+  }, [history]);
+
+  useEffect(() => {
+    let currentP = 8.00;
+    const initialHistory = Array.from({ length: 60 }, (_, i) => {
+      currentP = currentP + (Math.random() - 0.5) * 1.2;
+      if (currentP < 6) currentP = 6.5;
+      if (currentP > 22) currentP = 21.5;
+      return { time: `${i}`, price: currentP };
+    });
+    setFdyPrice(currentP);
+    setHistory(initialHistory);
+
+    const interval = setInterval(() => {
+      setFdyPrice(prev => {
+        const volatility = 0.4; 
+        const jitter = (Math.random() - 0.49) * volatility; 
+        let next = prev + jitter;
+        if (next > 22) next = 21.8;
+        if (next < 6) next = 6.2;
+
+        setHistory(h => {
+          const newH = [...h.slice(1), { 
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), 
+            price: next 
+          }];
+          return newH;
+        });
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleBuy = () => {
+    alert("Buying Coins will be available soon.");
+  };
+
+  const todayCalories = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    return scans
+      .filter(s => new Date(s.timestamp).toDateString() === todayStr)
+      .reduce((acc, s) => acc + (s.calories || 0), 0);
+  }, [scans]);
+
+  return (
+    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+        <h1 className="text-2xl font-black tracking-tight text-black">Exchange</h1>
+      </div>
+
+      {/* Featured Trading Card ($FDY) */}
+      <div className="bg-white p-8 rounded-[48px] shadow-card border border-gray-100 overflow-hidden relative">
+        <div className="flex justify-between items-start mb-10 relative z-10">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="w-5 h-5 bg-black rounded-md flex items-center justify-center">
+                 <Coins size={10} className="text-yellow-400" />
+              </div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">$FDY COIN / INR</p>
+            </div>
+            <div className="flex items-baseline gap-3">
+              <h2 className="text-6xl font-black tracking-tighter">₹{fdyPrice.toFixed(2)}</h2>
+              <div className={`flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black ${isUptrend ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                {isUptrend ? <TrendingUp size={12} className="mr-1"/> : <Activity size={12} className="mr-1 rotate-180"/>}
+                {isUptrend ? '+' : '-'}{((Math.random() * 2.5) + 0.1).toFixed(2)}%
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="h-64 w-full -mx-4 -mb-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={history}>
+              <defs>
+                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={isUptrend ? "#22C55E" : "#EF4444"} stopOpacity={0.15}/>
+                  <stop offset="95%" stopColor={isUptrend ? "#22C55E" : "#EF4444"} stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <Area 
+                type="linear" 
+                dataKey="price" 
+                stroke={isUptrend ? "#22C55E" : "#EF4444"} 
+                strokeWidth={3}
+                fillOpacity={1} 
+                fill="url(#chartGradient)" 
+                animationDuration={0}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* User Portfolio Metrics */}
+      <div className="space-y-4">
+        <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] px-2">Personal Portfolio</h3>
+        <div className="grid grid-cols-1 gap-3">
+          <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-100 flex items-center justify-between group active:scale-[0.98] transition-all">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center shadow-lg">
+                <Activity size={20} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Energy Budget</p>
+                <p className="text-xl font-black tracking-tight">{todayCalories} / {currentCalTarget} <span className="text-[10px] text-gray-400">kcal</span></p>
+              </div>
+            </div>
+            <div className="w-2 h-2 bg-black rounded-full animate-pulse" />
+          </div>
+
+          <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-100 flex items-center justify-between active:scale-[0.98] transition-all">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-orange-500 text-white rounded-2xl flex items-center justify-center shadow-lg">
+                <Flame size={20} fill="white" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Metabolic Chain</p>
+                <p className="text-xl font-black tracking-tight">{profile?.currentStreak || 0} <span className="text-[10px] text-gray-400">DAYS</span></p>
+              </div>
+            </div>
+            <TrendingUp size={16} className="text-green-500" />
+          </div>
+
+          <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-100 flex items-center justify-between active:scale-[0.98] transition-all">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-yellow-400 text-black rounded-2xl flex items-center justify-center shadow-lg">
+                <Coins size={20} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Holdings</p>
+                <p className="text-xl font-black tracking-tight">{profile?.points || 0} <span className="text-[10px] text-gray-400">FDY</span></p>
+              </div>
+            </div>
+            <p className="text-[10px] font-black text-gray-300 uppercase">Live</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-2">
+        <button 
+          onClick={handleBuy}
+          className="w-full bg-black text-white py-7 rounded-[32px] font-black text-lg uppercase tracking-widest shadow-2xl flex items-center justify-center gap-4 active:scale-[0.98] transition-all"
+        >
+          <DollarSign size={24}/>
+          Buy $FDY Coins
+        </button>
+      </div>
+    </div>
+  );
 };
 
 // --- Admin Sub-Components ---
@@ -172,7 +336,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     </div>
   );
 
-  // --- Views ---
+  // --- Admin Views ---
 
   const HomeView = (
     <div className="space-y-6 animate-fade-in">
@@ -239,21 +403,13 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
           <button 
             key={i} 
             onClick={() => { setSelectedUser(u); setEditGems((u.points || 0).toString()); setEditPro(!!u.isPremium); setAdminSubView('edit_node'); }}
-            className="w-full bg-white p-8 rounded-[32px] border border-gray-50 text-left shadow-sm active:scale-[0.98] transition-all relative"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <h4 className="text-xl font-black tracking-tight">{u.name || 'Anonymous Agent'}</h4>
-              <div className={`px-4 py-1.5 rounded-xl text-[9px] font-black tracking-widest uppercase ${u.isPremium ? 'bg-black text-yellow-400' : 'bg-gray-100 text-gray-400'}`}>
-                {u.isPremium ? 'PRO' : 'FREE'}
-              </div>
+            className="w-full bg-white p-8 rounded-[32px] border border-gray-100 shadow-card flex items-center gap-5 active:scale-95 transition-all">
+            <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center shrink-0 border border-gray-100"><UserIcon size={24} className="text-gray-300"/></div>
+            <div className="flex-1 min-w-0">
+               <div className="font-black text-base truncate">{u.name || 'Anonymous'}</div>
+               <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{u.points || 0} FDY • {u.isPremium ? 'PRO' : 'FREE'}</div>
             </div>
-            <div className="text-[11px] font-bold text-gray-400 uppercase tracking-tight mb-2 truncate max-w-[85%]">{u.email}</div>
-            <div className="text-[10px] font-black text-gray-200 uppercase tracking-widest mb-4">{u.uniqueTransferCode}</div>
-            <div className="flex items-center gap-2 text-[#3F51B5]">
-              <Gem size={16} className="fill-[#3F51B5]" />
-              <span className="text-lg font-black">{u.points || 0}</span>
-            </div>
-            <ChevronRight size={20} className="absolute right-8 bottom-10 text-gray-100" />
+            <ChevronRight size={18} className="text-gray-200" />
           </button>
         ))}
       </div>
@@ -265,15 +421,17 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       {renderHeader("Peer Transfers", true)}
       <div className="space-y-4">
         {transfers.map((t, i) => (
-          <div key={i} className="bg-white p-8 rounded-[32px] border border-gray-50 shadow-sm">
-            <div className="flex justify-between items-start mb-2">
-              <h4 className="text-xl font-black tracking-tight">{t.fromName}</h4>
-              <div className="text-2xl font-black tracking-tighter">{t.amount} Gem</div>
-            </div>
-            <div className="text-[11px] font-bold text-gray-300 uppercase mb-4">
-              {t.timestamp?.toDate ? t.timestamp.toDate().toLocaleString() : new Date(t.timestamp).toLocaleString()}
-            </div>
-            <div className="text-[10px] font-black text-[#3F51B5] uppercase tracking-widest bg-[#F0F2FF] px-3 py-1.5 rounded-lg inline-block">TO: {t.toCode}</div>
+          <div key={i} className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
+             <div className="p-6">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="text-xl font-black tracking-tight">{t.fromName}</h4>
+                  <div className="text-2xl font-black tracking-tighter">{t.amount} FDY</div>
+                </div>
+                <div className="text-[11px] font-bold text-gray-300 uppercase mb-4">
+                  {t.timestamp?.toDate ? t.timestamp.toDate().toLocaleString() : new Date(t.timestamp).toLocaleString()}
+                </div>
+                <div className="text-[10px] font-black text-black uppercase tracking-widest bg-gray-100 px-3 py-1.5 rounded-lg inline-block">TO: {t.toCode}</div>
+             </div>
           </div>
         ))}
       </div>
@@ -304,7 +462,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
           </div>
         </div>
 
-        <div className="bg-white p-10 rounded-[40px] border border-gray-50 flex items-center justify-between shadow-sm">
+        <div className="bg-white p-10 rounded-[40px] border border-gray-100 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-6">
             <Crown className="text-gray-200" size={32} />
             <span className="text-xl font-black tracking-tight">Pro Status</span>
@@ -351,7 +509,6 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         )}
       </div>
 
-      {/* Admin Bottom Nav Bar */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-3xl border-t border-gray-100 p-6 pb-10 flex justify-between items-center z-50 max-w-md mx-auto px-8 shadow-floating">
         <button onClick={() => { setAdminTab('home'); setAdminSubView('none'); }} className={`transition-all ${adminTab === 'home' && adminSubView === 'none' ? 'text-black scale-125' : 'text-gray-200'}`}><Home size={24} strokeWidth={2.5}/></button>
         <button onClick={() => { setAdminTab('transactions'); setAdminSubView('none'); }} className={`transition-all ${adminTab === 'transactions' ? 'text-black scale-125' : 'text-gray-200'}`}><DollarSign size={24} strokeWidth={2.5}/></button>
@@ -384,7 +541,7 @@ const VerificationBanner: React.FC<{ onResend: () => void; isResending: boolean 
 );
 
 const PendingScanCard: React.FC<{ imageUrl: string }> = ({ imageUrl }) => (
-  <div className="bg-white p-4 rounded-[32px] flex gap-4 shadow-card items-center border border-gray-50 relative overflow-hidden animate-pulse">
+  <div className="bg-white p-4 rounded-[32px] flex gap-4 shadow-card items-center border border-gray-100 relative overflow-hidden animate-pulse">
     <div className="w-14 h-14 rounded-2xl bg-gray-100 overflow-hidden shrink-0">
       <img src={imageUrl} className="w-full h-full object-cover opacity-40 grayscale" />
     </div>
@@ -611,7 +768,7 @@ const TeamSection: React.FC<{ onBack: () => void }> = ({ onBack }) => (
       </div>
     </div>
 
-    <div className="bg-white rounded-[48px] p-8 shadow-card border border-gray-50 space-y-6">
+    <div className="bg-white rounded-[48px] p-8 shadow-card border border-gray-100 space-y-6">
       <div className="flex items-center gap-3 text-gray-300">
         <Users size={16} /><h3 className="text-[9px] font-black uppercase tracking-[0.4em]">CORE TEAM MEMBERS</h3>
       </div>
@@ -635,140 +792,124 @@ const TeamSection: React.FC<{ onBack: () => void }> = ({ onBack }) => (
   </div>
 );
 
-const UnlockWorkoutView: React.FC<{ currentGems: number; isUnlocking: boolean; onUnlock: () => void; onGoToWallet: () => void; onBack: () => void }> = ({ currentGems, isUnlocking, onUnlock, onGoToWallet, onBack }) => (
-  <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
-    <div className="flex items-center gap-3">
-      <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
-      <h1 className="text-2xl font-black tracking-tight text-black">Training Node</h1>
-    </div>
-    <div className="bg-black text-white p-10 rounded-[48px] text-center shadow-2xl relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle_at_50%_0%,white,transparent_70%)]" />
-      <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-8 border border-white/10 backdrop-blur-md">
-        <Lock className="text-yellow-400" size={32} />
+/**
+ * Node expansion/referral management interface.
+ */
+const ReferralView: React.FC<{ profile: UserProfile | null; onBack: () => void; isVerified: boolean }> = ({ profile, onBack, isVerified }) => {
+  const referralCode = profile?.referralCode || 'NO-CODE';
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: 'Join Dr Foodie',
+        text: `Hey! Use my code ${referralCode} to join Dr Foodie and get bonus Gems!`,
+        url: window.location.origin
+      });
+    } else {
+      navigator.clipboard.writeText(referralCode);
+      alert("Code copied to clipboard!");
+    }
+  };
+  return (
+    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+        <h1 className="text-2xl font-black tracking-tight text-black">Referrals</h1>
       </div>
-      <h2 className="text-3xl font-black tracking-tight uppercase leading-tight mb-4">Clinical Training Module</h2>
-      <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed mb-10 px-4">Unlock personalized workout routines designed for your metabolic profile.</p>
-      <div className="bg-white/5 border border-white/10 py-3 px-6 rounded-full inline-flex items-center gap-3 mb-4 backdrop-blur-md">
-        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">COST:</span>
-        <span className="text-2xl font-black text-yellow-400 tracking-tighter">500 <Gem className="inline mb-1" size={16}/></span>
-      </div>
-    </div>
-
-    <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-yellow-50 rounded-xl flex items-center justify-center text-yellow-500 shadow-inner"><Gem size={20}/></div>
-          <div><div className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Your Balance</div><div className="text-2xl font-black tracking-tighter">{currentGems} Gems</div></div>
+      <div className="bg-white p-10 rounded-[48px] shadow-card border border-gray-100 text-center space-y-6">
+        <div className="w-20 h-20 bg-yellow-50 rounded-full flex items-center justify-center mx-auto">
+          <Gift size={40} className="text-yellow-600" />
         </div>
-        {currentGems < 500 && <div className="bg-red-50 text-red-500 px-3 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest">Low Balance</div>}
-      </div>
-      {currentGems >= 500 ? (
-        <button onClick={onUnlock} disabled={isUnlocking} className="w-full py-5 bg-black text-white rounded-[24px] font-black text-xs uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all">Authorize Unlock</button>
-      ) : (
-        <button onClick={onGoToWallet} className="w-full py-5 bg-black text-white rounded-[24px] font-black text-xs uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"><Plus size={16} className="text-yellow-400"/> Acquire More Gems</button>
-      )}
-      <p className="text-[8px] text-center text-gray-300 font-bold uppercase tracking-[0.2em] mt-5 px-6 leading-relaxed">Unlocking grants permanent access to clinical workout generation nodes.</p>
-    </div>
-  </div>
-);
-
-const AnalysisDetailView: React.FC<{ analysis: ScanHistoryItem | null; isAnalyzing: boolean; onBack: () => void; onDelete: () => void }> = ({ analysis, isAnalyzing, onBack, onDelete }) => (
-  <div className="h-full overflow-y-auto no-scrollbar bg-white">
-    <div className="relative h-[45vh]">
-      <img src={analysis?.imageUrl} className="w-full h-full object-cover" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
-      <div className="absolute top-8 left-6 right-6 flex justify-between z-20">
-        <button onClick={onBack} className="p-4 bg-black/20 backdrop-blur-md rounded-2xl text-white border border-white/20 active:scale-90 transition-all"><ArrowLeft size={20}/></button>
-        <button onClick={onDelete} className="p-4 bg-red-500/20 backdrop-blur-md rounded-2xl text-white border border-red-500/20 active:scale-90 transition-all"><Trash2 size={20}/></button>
-      </div>
-      <div className="absolute bottom-12 left-8 right-8 text-white">
-        <p className="text-[10px] font-black uppercase tracking-[0.4em] mb-2 opacity-50">{analysis?.mealType} • {new Date(analysis?.timestamp || '').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-        <h1 className="text-4xl font-black tracking-tighter leading-none">{analysis?.foodName}</h1>
-      </div>
-    </div>
-    <div className="px-8 pb-32 -mt-8 relative z-30">
-      <div className="bg-white p-8 rounded-[48px] shadow-2xl border border-gray-100 space-y-10">
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            { l: 'Energy', v: analysis?.calories, u: 'kcal' },
-            { l: 'Protein', v: analysis?.protein, u: 'g' },
-            { l: 'Carbs', v: analysis?.carbs, u: 'g' },
-            { l: 'Fat', v: analysis?.fat, u: 'g' }
-          ].map(stat => (
-            <div key={stat.l} className="bg-gray-50 p-4 rounded-3xl text-center border border-gray-100 flex flex-col justify-center items-center">
-              <div className="text-[7px] font-black text-gray-400 uppercase tracking-widest mb-1">{stat.l}</div>
-              <div className="text-sm font-black text-black leading-none">{stat.v}</div>
-              <div className="text-[7px] text-gray-300 font-bold uppercase mt-0.5">{stat.u}</div>
-            </div>
-          ))}
+        <div>
+          <h2 className="text-3xl font-black tracking-tighter">Expand the Network</h2>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">Earn 100 Gems for every new node established</p>
         </div>
-
-        <div className="space-y-2">
-          <div className="flex justify-between items-center mb-4 px-1">
-            <h4 className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em]">Dr Foodie Insights</h4>
-            <div className="bg-black text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">Score: {analysis?.healthScore}/10</div>
-          </div>
-          <div className="bg-gray-50/50 p-6 rounded-[32px] border-l-4 border-black">
-            <p className="text-sm font-bold text-gray-700 leading-relaxed italic">"{analysis?.microAnalysis}"</p>
-          </div>
+        <div className="bg-gray-50 p-6 rounded-[32px] border border-gray-100 border-dashed relative">
+          <p className="text-[8px] font-black text-gray-300 uppercase tracking-[0.4em] mb-2">YOUR UNIQUE KEY</p>
+          <div className="text-2xl font-black tracking-[0.2em]">{referralCode}</div>
         </div>
-
-        <div className="space-y-4">
-          <h4 className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] px-1">Metabolic Alternatives</h4>
-          <div className="space-y-3">
-            {analysis?.alternatives.map((alt, i) => (
-              <div key={i} className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-[28px] shadow-sm group hover:scale-[1.02] transition-transform">
-                <span className="text-xs font-black text-gray-600 uppercase tracking-tight">{alt}</span>
-                <Sparkle size={14} className="text-yellow-400 opacity-20 group-hover:opacity-100" />
-              </div>
-            ))}
-          </div>
-        </div>
+        <button onClick={handleShare} className="w-full bg-black text-white py-5 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all">
+          <Share size={18} /> Deploy Code
+        </button>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
-// Added sub-components to fix missing component errors
-const ReferralView: React.FC<{ profile: UserProfile | null; onBack: () => void; isVerified: boolean }> = ({ profile, onBack, isVerified }) => (
-  <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
-    <div className="flex items-center gap-3">
-      <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
-      <h1 className="text-2xl font-black tracking-tight text-black">Referrals</h1>
-    </div>
-    <div className="bg-black text-white p-10 rounded-[48px] text-center shadow-2xl">
-      <div className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mb-4">YOUR NODE ID</div>
-      <div className="text-4xl font-black tracking-tighter mb-4">{profile?.referralCode || 'SYNCING...'}</div>
-      <button onClick={() => { navigator.clipboard.writeText(profile?.referralCode || ''); alert("Code copied to clipboard."); }} className="bg-white/10 text-[9px] font-black uppercase tracking-widest px-6 py-3 rounded-full border border-white/10 active:scale-95">Copy Referral Node</button>
-    </div>
-    <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-4">
-      <h3 className="text-[9px] font-black text-gray-300 uppercase tracking-widest px-1">Rewards</h3>
-      <div className="p-6 bg-yellow-50 rounded-[32px] border border-yellow-100">
-        <p className="text-[11px] font-bold text-yellow-800 leading-relaxed uppercase">Share your node ID with friends. When they establish a connection, both of you receive a Gem bonus.</p>
-      </div>
-    </div>
-  </div>
-);
-
+/**
+ * Interface for entering and verifying UPI ID.
+ */
 const UPIEntryView: React.FC<{ onSave: (id: string) => void; onBack: () => void }> = ({ onSave, onBack }) => {
   const [upi, setUpi] = useState('');
   return (
     <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
       <div className="flex items-center gap-3">
         <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
-        <h1 className="text-2xl font-black tracking-tight text-black">UPI Uplink</h1>
+        <h1 className="text-2xl font-black tracking-tight text-black">UPI Link</h1>
       </div>
-      <div className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-5">
+      <div className="bg-white p-10 rounded-[48px] shadow-card border border-gray-100 space-y-6">
         <div className="space-y-2">
-          <label className="text-[9px] font-black text-gray-300 uppercase tracking-widest px-1">UPI ID / Phone Number</label>
-          <input value={upi} onChange={e=>setUpi(e.target.value)} placeholder="username@bank" className="w-full p-5 rounded-2xl bg-gray-50 border-none font-bold text-sm shadow-inner" />
+          <label className="text-[10px] font-black text-gray-300 uppercase tracking-widest px-4">UPI ADDRESS</label>
+          <input 
+            value={upi} 
+            onChange={e => setUpi(e.target.value)} 
+            placeholder="example@upi" 
+            className="w-full p-5 rounded-[24px] bg-gray-50 border-none font-bold text-sm shadow-inner" 
+          />
         </div>
-        <button onClick={()=>onSave(upi)} className="w-full bg-black text-white py-5 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">Save Node</button>
+        <button 
+          onClick={() => { if(upi.includes('@')) onSave(upi); else alert("Invalid UPI format."); }} 
+          className="w-full bg-black text-white py-5 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all"
+        >
+          Verify & Save
+        </button>
       </div>
     </div>
   );
 };
 
+/**
+ * Gem-based workout module unlock interface.
+ */
+const UnlockWorkoutView: React.FC<{ currentGems: number; isUnlocking: boolean; onUnlock: () => void; onGoToWallet: () => void; onBack: () => void }> = ({ currentGems, isUnlocking, onUnlock, onGoToWallet, onBack }) => (
+  <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+    <div className="flex items-center gap-3">
+      <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+      <h1 className="text-2xl font-black tracking-tight text-black">Unlock Fitness</h1>
+    </div>
+    <div className="bg-white p-10 rounded-[48px] shadow-card border border-gray-100 text-center space-y-8">
+      <div className="w-24 h-24 bg-gray-50 rounded-[40px] flex items-center justify-center mx-auto shadow-inner relative">
+        <Dumbbell size={48} className="text-black/10" />
+        <Lock size={24} className="absolute text-black" />
+      </div>
+      <div>
+        <h2 className="text-3xl font-black tracking-tighter">Clinical Training</h2>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2 leading-relaxed">AI-Generated workout routines optimized for your metabolic profile.</p>
+      </div>
+      <div className="bg-gray-50 p-6 rounded-[32px] border border-gray-100 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Gem size={20} className="text-yellow-500 fill-yellow-500" />
+          <span className="text-xl font-black tracking-tighter">500 Gems</span>
+        </div>
+        <div className={`text-[10px] font-black px-3 py-1.5 rounded-full ${currentGems >= 500 ? 'bg-green-50 text-green-500' : 'bg-red-50 text-red-500'}`}>
+          {currentGems >= 500 ? 'READY' : 'INSUFFICIENT'}
+        </div>
+      </div>
+      {currentGems >= 500 ? (
+        <button onClick={onUnlock} disabled={isUnlocking} className="w-full bg-black text-white py-5 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all">
+          {isUnlocking ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} fill="white" />} Unlock Now
+        </button>
+      ) : (
+        <button onClick={onGoToWallet} className="w-full bg-white text-black border-2 border-black py-5 rounded-[24px] font-black text-xs uppercase tracking-widest active:scale-95 transition-all">
+          Earn More Gems
+        </button>
+      )}
+    </div>
+  </div>
+);
+
+/**
+ * Environment selection for clinical workout generation.
+ */
 const WorkoutLocationView: React.FC<{ onBack: () => void; onSelect: (loc: WorkoutLocation) => void }> = ({ onBack, onSelect }) => (
   <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
     <div className="flex items-center gap-3">
@@ -776,58 +917,82 @@ const WorkoutLocationView: React.FC<{ onBack: () => void; onSelect: (loc: Workou
       <h1 className="text-2xl font-black tracking-tight text-black">Location</h1>
     </div>
     <div className="grid grid-cols-1 gap-4">
-      <button onClick={() => onSelect(WorkoutLocation.HOME)} className="bg-white p-10 rounded-[48px] shadow-card border border-gray-100 flex flex-col items-center gap-4 active:scale-95 transition-all">
-        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-black/10"><Home size={32}/></div>
-        <span className="text-xl font-black tracking-tight uppercase">Home Training</span>
+      <button onClick={() => onSelect(WorkoutLocation.HOME)} className="bg-white p-10 rounded-[48px] shadow-card border border-gray-100 text-left group active:scale-95 transition-all">
+        <Home size={32} className="mb-4 text-gray-200 group-hover:text-black transition-colors" />
+        <h2 className="text-3xl font-black tracking-tighter">Home Node</h2>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">Bodyweight & Minimal Equipment</p>
       </button>
-      <button onClick={() => onSelect(WorkoutLocation.GYM)} className="bg-white p-10 rounded-[48px] shadow-card border border-gray-100 flex flex-col items-center gap-4 active:scale-95 transition-all">
-        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-black/10"><Dumbbell size={32}/></div>
-        <span className="text-xl font-black tracking-tight uppercase">Gym Facility</span>
+      <button onClick={() => onSelect(WorkoutLocation.GYM)} className="bg-white p-10 rounded-[48px] shadow-card border border-gray-100 text-left group active:scale-95 transition-all">
+        <Dumbbell size={32} className="mb-4 text-gray-200 group-hover:text-black transition-colors" />
+        <h2 className="text-3xl font-black tracking-tighter">Gym Node</h2>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">Full Commercial Equipment</p>
       </button>
     </div>
   </div>
 );
 
+/**
+ * Muscle group selection interface.
+ */
 const WorkoutFocusView: React.FC<{ location: WorkoutLocation; selectedGroups: MuscleGroup[]; onToggle: (g: MuscleGroup) => void; onGenerate: () => void; onBack: () => void }> = ({ location, selectedGroups, onToggle, onGenerate, onBack }) => (
   <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
     <div className="flex items-center gap-3">
       <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
-      <h1 className="text-2xl font-black tracking-tight text-black">Focus Areas</h1>
+      <h1 className="text-2xl font-black tracking-tight text-black">Focus</h1>
     </div>
     <div className="grid grid-cols-2 gap-3">
-      {Object.values(MuscleGroup).map(g => (
-        <button key={g} onClick={() => onToggle(g)} className={`p-6 rounded-[32px] text-center font-black text-xs uppercase tracking-widest transition-all ${selectedGroups.includes(g) ? 'bg-black text-white shadow-xl scale-105' : 'bg-white text-gray-300 border border-gray-50'}`}>
-          {g}
+      {Object.values(MuscleGroup).map((g) => (
+        <button 
+          key={g} 
+          onClick={() => onToggle(g)} 
+          className={`p-6 rounded-[32px] text-left font-black transition-all border ${selectedGroups.includes(g) ? 'bg-black text-white border-black shadow-xl scale-105' : 'bg-white text-gray-300 border-gray-50 shadow-sm'}`}
+        >
+          <div className="text-[12px] uppercase tracking-tighter">{g}</div>
         </button>
       ))}
     </div>
-    <button onClick={onGenerate} disabled={selectedGroups.length === 0} className="w-full py-5 bg-black text-white rounded-[24px] font-black text-xs uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all mt-6 disabled:opacity-40">Generate Protocol</button>
+    <button 
+      onClick={onGenerate} 
+      disabled={selectedGroups.length === 0} 
+      className="w-full bg-black text-white py-5 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-20 mt-4"
+    >
+      Initialize Protocol <ChevronRight size={18} />
+    </button>
   </div>
 );
 
+/**
+ * Visualization of the AI-compiled workout plan.
+ */
 const WorkoutPlanView: React.FC<{ routine: Exercise[]; isGenerating: boolean; onBack: () => void }> = ({ routine, isGenerating, onBack }) => (
   <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
     <div className="flex items-center gap-3">
       <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
-      <h1 className="text-2xl font-black tracking-tight text-black">Routine</h1>
+      <h1 className="text-2xl font-black tracking-tight text-black">Protocol</h1>
     </div>
     {isGenerating ? (
-      <div className="bg-white p-20 rounded-[48px] shadow-card border border-gray-100 flex flex-col items-center justify-center gap-6">
-        <Loader2 className="animate-spin text-black/10" size={64}/>
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-300">Synchronizing Training Nodes...</p>
+      <div className="flex flex-col items-center justify-center py-40 gap-6 text-center">
+        <div className="relative">
+          <Loader2 className="animate-spin text-black/10" size={80} />
+          <Zap size={32} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-black animate-pulse" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black tracking-tighter uppercase">Compiling Routine</h2>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest max-w-[200px]">Optimizing sets and reps for maximum metabolic impact...</p>
+        </div>
       </div>
     ) : (
       <div className="space-y-4">
         {routine.map((ex, i) => (
-          <div key={ex.id} className="bg-white p-8 rounded-[40px] shadow-card border border-gray-100 space-y-4">
+          <div key={ex.id} className="bg-white p-6 rounded-[40px] shadow-card border border-gray-100 space-y-4">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-xl font-black tracking-tighter leading-tight">{ex.name}</h3>
-                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mt-1">{ex.sets} Sets • {ex.reps} Reps</p>
+                <h3 className="text-xl font-black tracking-tight leading-tight">{ex.name}</h3>
+                <div className="text-[9px] font-black text-gray-300 uppercase tracking-widest mt-1">{ex.sets} SETS • {ex.reps} REPS</div>
               </div>
-              <div className="bg-black text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">Exercise {i+1}</div>
+              <div className="bg-black text-white px-3 py-1.5 rounded-xl text-[8px] font-black uppercase">{i + 1}</div>
             </div>
-            <p className="text-[11px] font-bold text-gray-500 leading-relaxed uppercase">{ex.description}</p>
+            <p className="text-[11px] text-gray-600 font-medium leading-relaxed">{ex.description}</p>
           </div>
         ))}
       </div>
@@ -835,22 +1000,86 @@ const WorkoutPlanView: React.FC<{ routine: Exercise[]; isGenerating: boolean; on
   </div>
 );
 
+/**
+ * Detailed clinical analysis view for a specific food scan.
+ */
+const AnalysisDetailView: React.FC<{ analysis: ScanHistoryItem | null; isAnalyzing: boolean; onBack: () => void; onDelete: () => void }> = ({ analysis, isAnalyzing, onBack, onDelete }) => {
+  if (!analysis) return null;
+  return (
+    <div className="pt-6 space-y-6 animate-fade-in pb-32 px-6 h-full overflow-y-auto no-scrollbar">
+      <div className="flex items-center justify-between">
+        <button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-card active:scale-95 transition-all"><ArrowLeft size={18}/></button>
+        <button onClick={onDelete} className="p-3 bg-red-50 text-red-500 rounded-2xl active:scale-95 transition-all"><Trash2 size={18}/></button>
+      </div>
+
+      <div className="bg-white rounded-[48px] overflow-hidden shadow-card border border-gray-100">
+        <img src={analysis.imageUrl} className="w-full aspect-square object-cover" />
+        <div className="p-8 space-y-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-3xl font-black tracking-tighter leading-none">{analysis.foodName}</h2>
+              <div className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] mt-3">CLINICAL SCAN RESULT</div>
+            </div>
+            <div className="bg-black text-white px-4 py-2 rounded-2xl text-xs font-black">Score: {analysis.healthScore}/10</div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+             {[
+               { label: 'Calories', val: `${analysis.calories} kcal` },
+               { label: 'Protein', val: `${analysis.protein}g` },
+               { label: 'Carbs', val: `${analysis.carbs}g` },
+               { label: 'Fats', val: `${analysis.fat}g` }
+             ].map((m, i) => (
+               <div key={i} className="bg-gray-50 p-5 rounded-[32px] border border-gray-100">
+                 <div className="text-[8px] font-black text-gray-300 uppercase tracking-widest mb-1">{m.label}</div>
+                 <div className="text-xl font-black tracking-tighter">{m.val}</div>
+               </div>
+             ))}
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-gray-300 px-2"><Activity size={16}/><h3 className="text-[9px] font-black uppercase tracking-[0.4em]">MICRO ANALYSIS</h3></div>
+            <p className="bg-gray-50 p-6 rounded-[32px] text-[11px] font-bold text-gray-700 leading-relaxed italic border border-gray-100">"{analysis.microAnalysis}"</p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 text-gray-300 px-2"><Sparkle size={16}/><h3 className="text-[9px] font-black uppercase tracking-[0.4em]">ALTERNATIVES</h3></div>
+            <div className="flex flex-wrap gap-2">
+              {analysis.alternatives.map((alt, i) => (
+                <div key={i} className="bg-green-50 text-green-700 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-tight border border-green-100">{alt}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Modal for AI-triggered clarification questions during food analysis.
+ */
 const ClarificationModal: React.FC<{ question: string; onAnswer: (ans: string) => void; onApprox: () => void; onCancel: () => void }> = ({ question, onAnswer, onApprox, onCancel }) => {
   const [answer, setAnswer] = useState('');
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="bg-white rounded-[48px] w-full max-sm p-10 space-y-8 shadow-2xl relative">
-        <button onClick={onCancel} className="absolute top-8 right-8 text-gray-300 hover:text-black transition-colors"><X size={24}/></button>
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto text-blue-500 shadow-inner"><HelpCircle size={32}/></div>
-          <h2 className="text-2xl font-black tracking-tight">Clarification Needed</h2>
-          <p className="text-sm font-bold text-gray-500 leading-relaxed uppercase">{question}</p>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-fade-in">
+      <div className="bg-white rounded-[48px] w-full max-w-sm p-8 space-y-6 shadow-2xl">
+        <div className="text-center space-y-2">
+          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-2 text-blue-500"><HelpCircle size={32}/></div>
+          <h3 className="text-xl font-black tracking-tighter">Node Clarification</h3>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest leading-relaxed px-4">{question}</p>
         </div>
-        <div className="space-y-3">
-          <input value={answer} onChange={e=>setAnswer(e.target.value)} placeholder="Enter details..." className="w-full p-5 rounded-2xl bg-gray-50 border-none font-bold text-sm shadow-inner" />
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <button onClick={onApprox} className="bg-gray-100 text-gray-500 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">Approximate</button>
-            <button onClick={()=>onAnswer(answer)} disabled={!answer.trim()} className="bg-black text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all disabled:opacity-40">Confirm</button>
+        <textarea 
+          value={answer} 
+          onChange={e => setAnswer(e.target.value)} 
+          placeholder="Type your response..." 
+          className="w-full p-6 rounded-[32px] bg-gray-50 border-none font-bold text-sm shadow-inner min-h-[120px] resize-none" 
+        />
+        <div className="space-y-2">
+          <button onClick={() => onAnswer(answer)} disabled={!answer.trim()} className="w-full bg-black text-white py-5 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all disabled:opacity-20">Submit Data</button>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={onApprox} className="bg-gray-100 text-gray-600 py-4 rounded-[24px] font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">Approximate</button>
+            <button onClick={onCancel} className="bg-gray-100 text-red-500 py-4 rounded-[24px] font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">Cancel</button>
           </div>
         </div>
       </div>
@@ -866,7 +1095,7 @@ const App: React.FC = () => {
   const [isResending, setIsResending] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [view, setView] = useState<'home' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team' | 'wallet' | 'refer' | 'cashout' | 'upi_entry' | 'admin_dashboard' | 'workout_unlock' | 'workout_location' | 'workout_focus' | 'workout_plan' | 'update_profile'>('home');
+  const [view, setView] = useState<'home' | 'stats' | 'settings' | 'analysis' | 'camera' | 'team' | 'wallet' | 'refer' | 'cashout' | 'upi_entry' | 'admin_dashboard' | 'workout_unlock' | 'workout_location' | 'workout_focus' | 'workout_plan' | 'update_profile' | 'crypto'>('home');
   const [scans, setScans] = useState<(ScanHistoryItem & { isPending?: boolean; hasError?: boolean })[]>([]);
   const [showPremium, setShowPremium] = useState(false);
   const [analysis, setAnalysis] = useState<ScanHistoryItem | null>(null);
@@ -1162,12 +1391,13 @@ const App: React.FC = () => {
               <div className="space-y-3">
                  {[
                    { icon: <Edit3 size={18}/>, label: 'Update Metrics', action: () => setView('update_profile') },
+                   { icon: <Coins size={18}/>, label: 'Crypto Market', action: () => setView('crypto') },
                    { icon: <Banknote size={18}/>, label: 'Cashout Rewards', action: () => setView('cashout') },
                    { icon: <WalletIcon size={18}/>, label: 'Vault Access', action: () => setView('wallet') },
                    { icon: <Gift size={18}/>, label: 'Referral Nodes', action: () => setView('refer') },
                    { icon: <Users size={18}/>, label: 'Team Info', action: () => setView('team') },
                  ].map((item, i) => (
-                   <button key={i} onClick={item.action} className="w-full bg-white p-6 rounded-[32px] flex items-center justify-between border border-gray-50 shadow-sm active:scale-95 transition-all">
+                   <button key={i} onClick={item.action} className="w-full bg-white p-6 rounded-[32px] flex items-center justify-between border border-gray-100 shadow-sm active:scale-95 transition-all">
                       <div className="flex items-center gap-4"><div className="text-black/30">{item.icon}</div><span className="text-[15px] font-black text-gray-700 tracking-tight">{item.label}</span></div>
                       <ChevronRight size={18} className="text-gray-100" />
                    </button>
@@ -1183,6 +1413,7 @@ const App: React.FC = () => {
           {view === 'upi_entry' && <UPIEntryView onSave={(id)=>{ updateDoc(doc(db,"profiles",user!.uid),{upiId:id}); setProfile(p=>p?({...p,upiId:id}):null); setView('cashout'); }} onBack={() => setView('cashout')} />}
           {view === 'update_profile' && <Onboarding onComplete={saveProfile} initialData={profile} onBack={() => setView('settings')} />}
           {view === 'team' && <TeamSection onBack={() => setView('settings')} />}
+          {view === 'crypto' && <CryptoMarketView profile={profile} scans={scans} currentCalTarget={currentCalTarget} onBack={() => setView('settings')} />}
           {view === 'workout_unlock' && <UnlockWorkoutView currentGems={profile?.points || 0} isUnlocking={isUnlockingWorkout} onUnlock={handleUnlockWorkout} onGoToWallet={() => setView('wallet')} onBack={() => setView('home')} />}
           {view === 'workout_location' && <WorkoutLocationView onBack={() => setView('home')} onSelect={(loc) => { setSelectedLocation(loc); setView('workout_focus'); }} />}
           {view === 'workout_focus' && <WorkoutFocusView location={selectedLocation!} selectedGroups={selectedMuscleGroups} onToggle={(g)=>setSelectedMuscleGroups(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev, g])} onGenerate={()=>handleGenerateWorkout()} onBack={() => setView('workout_location')} />}
@@ -1197,7 +1428,7 @@ const App: React.FC = () => {
           <button onClick={()=>{ if (profile?.isWorkoutUnlocked) setView('workout_location'); else setView('workout_unlock'); }} className={`transition-all ${view.startsWith('workout')?'text-black scale-125':'text-black/15'}`}><Dumbbell size={22} strokeWidth={2.5}/></button>
           <div className="relative -mt-14 flex justify-center z-50"><button onClick={startCamera} className="w-18 h-18 bg-black rounded-full flex items-center justify-center text-white border-[7px] border-[#F2F2F7] shadow-2xl active:scale-90 transition-all"><Plus size={34} strokeWidth={3}/></button></div>
           <button onClick={()=>{setView('stats')}} className={`transition-all ${view==='stats'?'text-black scale-125':'text-black/15'}`}><BarChart2 size={22} strokeWidth={2.5}/></button>
-          <button onClick={()=>setView('settings')} className={`transition-all ${['settings', 'wallet', 'refer', 'cashout', 'team', 'upi_entry', 'update_profile'].includes(view)?'text-black scale-125':'text-black/15'}`}><Settings size={22} strokeWidth={2.5}/></button>
+          <button onClick={()=>setView('settings')} className={`transition-all ${['settings', 'wallet', 'refer', 'cashout', 'team', 'upi_entry', 'update_profile', 'crypto'].includes(view)?'text-black scale-125':'text-black/15'}`}><Settings size={22} strokeWidth={2.5}/></button>
         </nav>
       )}
 
