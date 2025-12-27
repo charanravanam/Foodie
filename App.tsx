@@ -84,48 +84,67 @@ const formatCoins = (num: number) => {
 const CryptoMarketView: React.FC<{ profile: UserProfile | null; scans: ScanHistoryItem[]; currentCalTarget: number; onBack: () => void }> = ({ profile, scans, currentCalTarget, onBack }) => {
   const [fdyPrice, setFdyPrice] = useState(8.00);
   const [history, setHistory] = useState<{ time: string; price: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Strictly synchronized global price logic
+  useEffect(() => {
+    const marketDocRef = doc(db, "market", "state");
+    
+    // Listen to global market state
+    const unsubscribe = onSnapshot(marketDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setFdyPrice(data.price || 8.00);
+        if (data.history) setHistory(data.history);
+      }
+      setLoading(false);
+    });
+
+    // Heartbeat logic to maintain price movement globally
+    // We update every 10 seconds if stale to ensure real-time global consistency
+    const heartbeat = setInterval(async () => {
+      try {
+        await runTransaction(db, async (transaction) => {
+          const sfDoc = await transaction.get(marketDocRef);
+          const now = Date.now();
+          
+          if (!sfDoc.exists() || now - (sfDoc.data().lastUpdated || 0) > 10000) {
+            const currentPrice = sfDoc.exists() ? sfDoc.data().price : 8.00;
+            const history = sfDoc.exists() ? sfDoc.data().history : [];
+            
+            const volatility = 0.4;
+            const change = (Math.random() - 0.48) * volatility; // Slight bias upward
+            let newPrice = currentPrice + change;
+            
+            // Boundary constraints
+            if (newPrice > 35) newPrice = 34.2;
+            if (newPrice < 6) newPrice = 6.8;
+
+            const timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const newHistory = [...history.slice(-49), { time: timeLabel, price: newPrice }];
+
+            transaction.set(marketDocRef, {
+              price: newPrice,
+              lastUpdated: now,
+              history: newHistory
+            }, { merge: true });
+          }
+        });
+      } catch (e) {
+        // Transactions fail silently if another client wins the race, which is fine.
+      }
+    }, 5000); // Check every 5s, but only update if 10s passed
+
+    return () => {
+      unsubscribe();
+      clearInterval(heartbeat);
+    };
+  }, []);
 
   const isUptrend = useMemo(() => {
     if (history.length < 2) return true;
     return history[history.length - 1].price >= history[history.length - 2].price;
   }, [history]);
-
-  useEffect(() => {
-    let currentP = 8.00;
-    const initialHistory = Array.from({ length: 60 }, (_, i) => {
-      currentP = currentP + (Math.random() - 0.5) * 1.2;
-      if (currentP < 6) currentP = 6.5;
-      if (currentP > 22) currentP = 21.5;
-      return { time: `${i}`, price: currentP };
-    });
-    setFdyPrice(currentP);
-    setHistory(initialHistory);
-
-    const interval = setInterval(() => {
-      setFdyPrice(prev => {
-        const volatility = 0.4; 
-        const jitter = (Math.random() - 0.49) * volatility; 
-        let next = prev + jitter;
-        if (next > 22) next = 21.8;
-        if (next < 6) next = 6.2;
-
-        setHistory(h => {
-          const newH = [...h.slice(1), { 
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), 
-            price: next 
-          }];
-          return newH;
-        });
-        return next;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleBuy = () => {
-    alert("Buying Coins will be available soon.");
-  };
 
   const todayCalories = useMemo(() => {
     const todayStr = new Date().toDateString();
@@ -141,54 +160,66 @@ const CryptoMarketView: React.FC<{ profile: UserProfile | null; scans: ScanHisto
         <h1 className="text-2xl font-black tracking-tight text-black">Exchange</h1>
       </div>
 
-      {/* Featured Trading Card ($FDY) */}
-      <div className="bg-white p-8 rounded-[48px] shadow-card border border-gray-100 overflow-hidden relative">
-        <div className="flex justify-between items-start mb-10 relative z-10">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <div className="w-5 h-5 bg-black rounded-md flex items-center justify-center">
-                 <Coins size={10} className="text-yellow-400" />
+      <div className="bg-white p-8 rounded-[48px] shadow-card border border-gray-100 overflow-hidden relative min-h-[360px] flex flex-col">
+        {loading ? (
+           <div className="flex-1 flex flex-col items-center justify-center gap-4">
+              <Loader2 className="animate-spin text-black/10" size={32} />
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Uplinking to Network...</p>
+           </div>
+        ) : (
+          <>
+            <div className="flex justify-between items-start mb-8 relative z-10">
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="w-5 h-5 bg-black rounded-md flex items-center justify-center shadow-md">
+                    <Coins size={10} className="text-yellow-400" />
+                  </div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">$FDY COIN / INR</p>
+                </div>
+                <div className="flex items-baseline gap-3">
+                  <h2 className="text-6xl font-black tracking-tighter">₹{fdyPrice.toFixed(2)}</h2>
+                  <div className={`flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black ${isUptrend ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                    {isUptrend ? <TrendingUp size={12} className="mr-1"/> : <Activity size={12} className="mr-1 rotate-180"/>}
+                    {isUptrend ? '+' : '-'}{((Math.random() * 1.2) + 0.1).toFixed(2)}%
+                  </div>
+                </div>
               </div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">$FDY COIN / INR</p>
-            </div>
-            <div className="flex items-baseline gap-3">
-              <h2 className="text-6xl font-black tracking-tighter">₹{fdyPrice.toFixed(2)}</h2>
-              <div className={`flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black ${isUptrend ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-                {isUptrend ? <TrendingUp size={12} className="mr-1"/> : <Activity size={12} className="mr-1 rotate-180"/>}
-                {isUptrend ? '+' : '-'}{((Math.random() * 2.5) + 0.1).toFixed(2)}%
+              <div className="flex flex-col items-end gap-1">
+                 <span className="text-[8px] font-black text-white bg-black px-2 py-1 rounded-md uppercase tracking-widest flex items-center gap-1.5 shadow-lg">
+                    <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" /> Global Live
+                 </span>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="h-64 w-full -mx-4 -mb-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={history}>
-              <defs>
-                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={isUptrend ? "#22C55E" : "#EF4444"} stopOpacity={0.15}/>
-                  <stop offset="95%" stopColor={isUptrend ? "#22C55E" : "#EF4444"} stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <Area 
-                type="linear" 
-                dataKey="price" 
-                stroke={isUptrend ? "#22C55E" : "#EF4444"} 
-                strokeWidth={3}
-                fillOpacity={1} 
-                fill="url(#chartGradient)" 
-                animationDuration={0}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+            <div className="h-64 w-full -mx-4 -mb-4 mt-auto">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={history}>
+                  <defs>
+                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={isUptrend ? "#22C55E" : "#EF4444"} stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor={isUptrend ? "#22C55E" : "#EF4444"} stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <Area 
+                    type="monotone" 
+                    dataKey="price" 
+                    stroke={isUptrend ? "#22C55E" : "#EF4444"} 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#chartGradient)" 
+                    animationDuration={800}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* User Portfolio Metrics */}
       <div className="space-y-4">
         <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] px-2">Personal Portfolio</h3>
         <div className="grid grid-cols-1 gap-3">
-          <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-100 flex items-center justify-between group active:scale-[0.98] transition-all">
+          <div className="bg-white p-6 rounded-[32px] shadow-card border border-gray-100 flex items-center justify-between active:scale-[0.98] transition-all">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center shadow-lg">
                 <Activity size={20} />
@@ -224,14 +255,14 @@ const CryptoMarketView: React.FC<{ profile: UserProfile | null; scans: ScanHisto
                 <p className="text-xl font-black tracking-tight">{profile?.points || 0} <span className="text-[10px] text-gray-400">FDY</span></p>
               </div>
             </div>
-            <p className="text-[10px] font-black text-gray-300 uppercase">Live</p>
+            <div className="text-[9px] font-black text-gray-400 uppercase">Settled</div>
           </div>
         </div>
       </div>
 
       <div className="pt-2">
         <button 
-          onClick={handleBuy}
+          onClick={() => alert("Buying Coins will be available soon.")}
           className="w-full bg-black text-white py-7 rounded-[32px] font-black text-lg uppercase tracking-widest shadow-2xl flex items-center justify-center gap-4 active:scale-[0.98] transition-all"
         >
           <DollarSign size={24}/>
@@ -1416,7 +1447,8 @@ const App: React.FC = () => {
           {view === 'crypto' && <CryptoMarketView profile={profile} scans={scans} currentCalTarget={currentCalTarget} onBack={() => setView('settings')} />}
           {view === 'workout_unlock' && <UnlockWorkoutView currentGems={profile?.points || 0} isUnlocking={isUnlockingWorkout} onUnlock={handleUnlockWorkout} onGoToWallet={() => setView('wallet')} onBack={() => setView('home')} />}
           {view === 'workout_location' && <WorkoutLocationView onBack={() => setView('home')} onSelect={(loc) => { setSelectedLocation(loc); setView('workout_focus'); }} />}
-          {view === 'workout_focus' && <WorkoutFocusView location={selectedLocation!} selectedGroups={selectedMuscleGroups} onToggle={(g)=>setSelectedMuscleGroups(prev=>prev.includes(g)?prev.filter(x=>x!==g):[...prev, g])} onGenerate={()=>handleGenerateWorkout()} onBack={() => setView('workout_location')} />}
+          {/* Fix: Added 'item =>' to the filter callback to define the parameter 'item' used in the comparison */}
+          {view === 'workout_focus' && <WorkoutFocusView location={selectedLocation!} selectedGroups={selectedMuscleGroups} onToggle={(g)=>setSelectedMuscleGroups(prev=>prev.includes(g)?prev.filter(item => item !== g):[...prev, g])} onGenerate={()=>handleGenerateWorkout()} onBack={() => setView('workout_location')} />}
           {view === 'workout_plan' && <WorkoutPlanView routine={currentRoutine} isGenerating={isGeneratingRoutine} onBack={() => setView('workout_focus')} />}
           {view === 'analysis' && <AnalysisDetailView analysis={analysis} isAnalyzing={false} onBack={() => setView('home')} onDelete={async () => { if(confirm("Discard node data?")) { await deleteDoc(doc(db,"profiles",user!.uid,"scans",analysis!.id)); setScans(prev=>prev.filter(s=>s.id!==analysis!.id)); setView('home'); } }} />}
         </div>
